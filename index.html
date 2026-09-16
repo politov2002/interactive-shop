@@ -1,4 +1,4 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><title>ЦЕХ ЧПУ</title><style>
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>ЦЕХ ЧПУ БАЗА</title><style>
 :root{--bg:#121214;--c:#1e1e24;--t:#f0faf2;--m:#94a3b8;--w:#10b981;--s:#f59e0b;--b:#ef4444;--n:#3b82f6;--brd:#334155}
 *{box-sizing:border-box;margin:0;padding:0;font-family:sans-serif}
 body{background:var(--bg);color:var(--t);padding:20px}
@@ -19,8 +19,11 @@ header{text-align:center;margin-bottom:20px}
 .fg{margin-bottom:10px}.fg label{display:block;font-size:0.8rem;color:var(--m);margin-bottom:4px}
 .fg select,.fg input{width:100%;background:#0f172a;border:1px solid var(--brd);padding:8px;border-radius:6px;color:#fff;outline:none}
 .btn{width:100%;background:#4f46e5;color:#fff;border:none;padding:10px;border-radius:6px;font-weight:bold;cursor:pointer;margin-top:10px}
-</style></head><body>
-<header><h1>🏭 Ситуационный Центр Цеха</h1><div class="stats">
+</style>
+<script src="https://gstatic.com"></script>
+<script src="https://gstatic.com"></script>
+</head><body>
+<header><h1>🏭 Центральный Ситуационный Центр</h1><div class="stats">
 <div class="st-card"><h3>В работе</h3><div class="val" style="color:var(--w)" id="wc">0</div></div>
 <div class="st-card"><h3>Наладка</h3><div class="val" style="color:var(--s)" id="sc">0</div></div>
 <div class="st-card"><h3>Поломка</h3><div class="val" style="color:var(--b)" id="bc">0</div></div>
@@ -31,22 +34,51 @@ header{text-align:center;margin-bottom:20px}
 <div class="fg"><label>Деталь</label><input type="text" id="fp"></div>
 <div class="fg"><label>Количество (шт)</label><input type="number" id="fc"></div>
 <div class="fg"><label>Загрузка (%)</label><input type="number" id="fl" min="0" max="100"></div>
-<button class="btn" onclick="saveM()">Сохранить</button></div></div>
+<button class="btn" onclick="saveM()">Сохранить в базу</button></div></div>
 <script>
-const macs=[
-{id:1,name:"Фрезерный 3Х Китай №1",type:"milling",cnc:"Fanuc",status:"work",part:"Корпус редуктора",count:14,load:85},
-{id:2,name:"Фрезерный 3Х Китай №2",type:"milling",cnc:"Fanuc",status:"work",part:"Фланец А3",count:32,load:78},
-{id:3,name:"Фрезерный 3Х Китай №3",type:"milling",cnc:"Fanuc",status:"setup",part:"Переналадка",count:0,load:0},
-{id:4,name:"Рободрил 5-ти координатный",type:"milling",cnc:"Fanuc",status:"work",part:"Лопатка турбины",count:3,load:92},
-{id:5,name:"Фрезерный 3+1 координатный",type:"milling",cnc:"Fanuc",status:"no-mat",part:"Ожидание",count:45,load:0},
-{id:6,name:"Китайский Токарно-Фрезерный",type:"turning",cnc:"Fanuc",status:"work",part:"Вал приводной",count:19,load:70},
-{id:7,name:"Okuma Токарно-Фрезерная",type:"turning",cnc:"OSP",status:"work",part:"Шпиндель точный",count:8,load:88},
-{id:8,name:"Токарный станок Малютка №1",type:"turning",cnc:"NC-201",status:"work",part:"Шпилька М12",count:142,load:50},
-{id:9,name:"Токарный станок Малютка №2",type:"turning",cnc:"NC-201",status:"no-mat",part:"Ожидание",count:80,load:0},
-{id:10,name:"Токарный с револьверной головкой Siemens",type:"turning",cnc:"Siemens",status:"work",part:"Муфта муфтовая",count:24,load:82},
-{id:11,name:"Токарный с револьверной головкой",type:"turning",cnc:"ЧПУ",status:"break",part:"Сбой привода",count:11,load:0}
-];
-let curId=null;
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyD7IyidqpsQNxOyIO-gXiC2Y0iTgfGuBEw",
+  authDomain: "nahabino-d8803.firebaseapp.com",
+  databaseURL: "https://nahabino-d8803-default-rtdb.firebaseio.com",
+  projectId: "nahabino-d8803",
+  storageBucket: "nahabino-d8803.firebasestorage.app",
+  messagingSenderId: "523106922724",
+  appId: "1:523106922724:web:daa409b569cb12653b3cf1"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+let macs = []; let curId = null;
+
+const initialData = {
+  1: {id:1,name:"Фрезерный 3Х Китай №1",type:"milling",cnc:"Fanuc",status:"work",part:"Корпус редуктора",count:14,load:85},
+  2: {id:2,name:"Фрезерный 3Х Китай №2",type:"milling",cnc:"Fanuc",status:"work",part:"Фланец А3",count:32,load:78},
+  3: {id:3,name:"Фрезерный 3Х Китай №3",type:"milling",cnc:"Fanuc",status:"setup",part:"Переналадка",count:0,load:0},
+  4: {id:4,name:"Рободрил 5-ти координатный",type:"milling",cnc:"Fanuc",status:"work",part:"Лопатка турбины",count:3,load:92},
+  5: {id:5,name:"Фрезерный 3+1 координатный",type:"milling",cnc:"Fanuc",status:"no-mat",part:"Ожидание",count:45,load:0},
+  6: {id:6,name:"Китайский Токарно-Фрезерный",type:"turning",cnc:"Fanuc",status:"work",part:"Вал приводной",count:19,load:70},
+  7: {id:7,name:"Okuma Токарно-Фрезерная",type:"turning",cnc:"OSP",status:"work",part:"Шпиндель точный",count:8,load:88},
+  8: {id:8,name:"Токарный станок Малютка №1",type:"turning",cnc:"NC-201",status:"work",part:"Шпилька М12",count:142,load:50},
+  9: {id:9,name:"Токарный станок Малютка №2",type:"turning",cnc:"NC-201",status:"no-mat",part:"Ожидание",count:80,load:0},
+  10:{id:10,name:"Токарный с револьверной головкой Siemens",type:"turning",cnc:"Siemens",status:"work",part:"Муфта муфтовая",count:24,load:82},
+  11:{id:11,name:"Токарный с револьверной головкой",type:"turning",cnc:"ЧПУ",status:"break",part:"Сбой привода",count:11,load:0}
+};
+
+db.ref('machines').on('value', (snapshot) => {
+    const data = snapshot.val();
+    if (!data) { db.ref('machines').set(initialData); return; }
+    macs = Object.values(data); render();
+});
+
 function render(){
     const grid=document.getElementById('g');grid.innerHTML='';let grp='';
     macs.forEach(m=>{
@@ -71,9 +103,13 @@ function openM(id){
 }
 function closeM(){document.getElementById('ov').style.display='none';curId=null}
 function saveM(){
-    if(curId===null)return;const m=macs.find(x=>x.id===curId);
-    m.status=document.getElementById('fst').value;m.part=document.getElementById('fp').value;m.count=parseInt(document.getElementById('fc').value)||0;m.load=parseInt(document.getElementById('fl').value)||0;
-    closeM();render();
+    if(curId===null)return;
+    const updates = {
+        status: document.getElementById('fst').value,
+        part: document.getElementById('fp').value,
+        count: parseInt(document.getElementById('fc').value)||0,
+        load: parseInt(document.getElementById('fl').value)||0
+    };
+    db.ref('machines/' + curId).update(updates); closeM();
 }
-render();
 </script></body></html>
