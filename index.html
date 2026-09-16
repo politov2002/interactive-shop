@@ -20,8 +20,8 @@ header{text-align:center;margin-bottom:20px}
 .fg select,.fg input{width:100%;background:#0f172a;border:1px solid var(--brd);padding:8px;border-radius:6px;color:#fff;outline:none}
 .btn{width:100%;background:#4f46e5;color:#fff;border:none;padding:10px;border-radius:6px;font-weight:bold;cursor:pointer;margin-top:10px}
 </style>
-<script src="https://gstatic.com"></script>
-<script src="https://gstatic.com"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 </head><body>
 <header><h1>🏭 Центральный Ситуационный Центр</h1><div class="stats">
 <div class="st-card"><h3>В работе</h3><div class="val" style="color:var(--w)" id="wc">0</div></div>
@@ -36,12 +36,6 @@ header{text-align:center;margin-bottom:20px}
 <div class="fg"><label>Загрузка (%)</label><input type="number" id="fl" min="0" max="100"></div>
 <button class="btn" onclick="saveM()">Сохранить в базу</button></div></div>
 <script>
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyD7IyidqpsQNxOyIO-gXiC2Y0iTgfGuBEw",
   authDomain: "nahabino-d8803.firebaseapp.com",
@@ -51,9 +45,6 @@ const firebaseConfig = {
   messagingSenderId: "523106922724",
   appId: "1:523106922724:web:daa409b569cb12653b3cf1"
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
