@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Интерактивный Дашборд Цеха ЧПУ</title>
+    <style>
+        :root {
+            --bg-color: #121824;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --status-work: #10b981;
+            --status-setup: #f59e0b;
+            --status-break: #ef4444;
+            --status-no-mat: #3b82f6;
+            --border-color: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 20px;
+        }
+
+        header {
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        /* Панель счетчиков */
+        .analytics-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .metric-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .metric-card h3 {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-value {
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        #metric-oee {
+            color: #a855f7;
+        }
+
+        /* Сетка цеха */
+        .shop-floor {
+            display: grid;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        .group-section {
+            background: rgba(30, 41, 59, 0.3);
+            border: 1px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .group-title {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: var(--text-muted);
+            border-left: 4px solid var(--status-no-mat);
+            padding-left: 10px;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+        }
+
+        /* Плитка станка */
+        .machine-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .machine-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+
+        .machine-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 6px;
+            height: 100%;
+            background-color: var(--status-no-mat);
+        }
+
+        /* Динамические цвета левой полосы */
+        .machine-card[data-status="work"]::before { background-color: var(--status-work); }
+        .machine-card[data-status="setup"]::before { background-color: var(--status-setup); }
+        .machine-card[data-status="break"]::before { background-color: var(--status-break); }
+        .machine-card[data-status="no_mat"]::before { background-color: var(--status-no-mat); }
+
+        .machine-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            padding-left: 5px;
+        }
+
+        .machine-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .status-badge {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-badge[data-status="work"] { background: rgba(16, 185, 129, 0.2); color: var(--status-work); }
+        .status-badge[data-status="setup"] { background: rgba(245, 158, 11, 0.2); color: var(--status-setup); }
+        .status-badge[data-status="break"] { background: rgba(239, 68, 68, 0.2); color: var(--status-break); }
+        .status-badge[data-status="no_mat"] { background: rgba(59, 130, 246, 0.2); color: var(--status-no-mat); }
+
+        .machine-info {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            padding-left: 5px;
+        }
+
+        .progress-bar-container {
+            background: #334155;
+            height: 6px;
+            border-radius: 3px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            background: var(--status-work);
+            height: 100%;
+            width: 0%;
+            transition: width 0.4s;
+        }
+
+        /* Модальное окно */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            width: 100%;
+            max-width: 500px;
+            padding: 25px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 22px;
+            cursor: pointer;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .modal-details {
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .modal-details p {
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .modal-details span {
+            color: var(--text-muted);
+        }
+
+        .control-panel {
+            border-top: 1px solid var(--border-color);
+            padding-top: 15px;
+        }
+
+        .control-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--text-muted);
+        }
+
+        .status-select {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 15px;
+            outline: none;
+        }
+
+        .save-btn {
+            width: 100%;
+            padding: 12px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .save-btn:hover {
+            background: #1d4ed8;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🏭 Интерактивная панель мониторинга цеха</h1>
+        
+        <!-- Верхняя аналитика -->
+        <div class="analytics-panel">
+            <div class="metric-card">
+                <h3>В работе</h3>
+                <div class="metric-value" id="count-work" style="color: var(--status-work);">0</div>
+            </div>
+            <div class="metric-card">
+                <h3>Наладка</h3>
+                <div class="metric-value" id="count-setup" style="color: var(--status-setup);">0</div>
+            </div>
+            <div class="metric-card">
+                <h3>Поломка / Авария</h3>
+                <div class="metric-value" id="count-break" style="color: var(--status-break);">0</div>
+            </div>
+            <div class="metric-card">
+                <h3>Нет заготовки</h3>
+                <div class="metric-value" id="count-no-mat" style="color: var(--status-no-mat);">0</div>
+            </div>
+            <div class="metric-card">
+                <h3>Эффективность (OEE)</h3>
+                <div class="metric-value" id="metric-oee">0%</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Плитки цеха -->
+    <main class="shop-floor">
+        
+        <!-- Фрезерная группа -->
+        <section class="group-section">
+            <div class="group-title">Фрезерная группа ЧПУ</div>
+            <div class="grid-container" id="milling-group"></div>
+        </section>
+
+        <!-- Токарная группа -->
+        <section class="group-section">
+            <div class="group-title">Токарно-фрезерный комплекс и токарная группа</div>
+            <div class="grid-container" id="turning-group"></div>
+        </section>
+
+    </main>
+
+    <!-- Модальное окно управления -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-content">
+            <button class="close-btn" id="closeModal">&times;</button>
+            <div class="modal-title" id="modalMachineName">Название станка</div>
+            
+            <div class="modal-details">
+                <p><span>ЧПУ система:</span> <strong id="modalCNC">--</strong></p>
+                <p><span>Текущая деталь:</span> <strong id="modalPart">--</strong></p>
+                <p><span>Оператор смены:</span> <strong id="modalOperator">--</strong></p>
+                <p><span>Загрузка станка:</span> <strong id="modalLoad">--</strong></p>
+            </div>
+
+            <div class="control-panel">
+                <div class="control-title">Управление станком (Мастер цеха)</div>
+                <select class="status-select" id="statusSelect">
+                    <option value="work">🟢 В работе</option>
+                    <option value="setup">🟡 Наладка</option>
+                    <option value="break">🔴 Поломка</option>
+                    <option value="no_mat">🔵 Нет заготовки</option>
+                </select>
+                <button class="save-btn" id="saveStatusBtn">Сохранить изменения</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Первоначальная база данных по 11 станкам цеха
+        const machines = [
+            // Фрезерная группа
+            { id: 1, name: "3х-осевой Фрезер №1 (КНР)", cnc: "Fanuc", group: "milling", status: "work", part: "Корпус редуктора", operator: "Иванов И.", load: 85 },
+            { id: 2, name: "3х-осевой Фрезер №2 (КНР)", cnc: "Fanuc", group: "milling", status: "work", part: "Фланец переходной", operator: "Петров А.", load: 70 },
+            { id: 3, name: "3х-осевой Фрезер №3 (КНР)", cnc: "Fanuc", group: "milling", status: "setup", part: "Пресс-форма (наладка)", operator: "Сидоров К.", load: 0 },
+            { id: 4, name: "Рободрил 5ти-координатный", cnc: "Fanuc Robodrill", group: "milling", status: "work", part: "Лопатка турбины", operator: "Алексеев М.", load: 95 },
+            { id: 5, name: "Фрезерный станок 3+1 оси", cnc: "Fanuc", group: "milling", status: "no_mat", part: "Вал шлицевой", operator: "Григорьев В.", load: 0 },
+            
+            // Токарная группа
+            { id: 6, name: "Токарно-фрезерный с приводным инстр. (КНР)", cnc: "Fanuc", group: "turning", status: "work", part: "Штуцер фигурный", operator: "Николаев Д.", load: 80 },
+            { id: 7, name: "Okuma токарно-фрезерная", cnc: "OSP", group: "turning", status: "work", part: "Вал высокой точности", operator: "Федоров Е.", load: 90 },
+            { id: 8, name: "Токарный станок Малютка №1", cnc: "NC-201", group: "turning", status: "no_mat", part: "Болт М12 спец.", operator: "Ученик 1", load: 0 },
+            { id: 9, name: "Токарный станок Малютка №2", cnc: "NC-201", group: "turning", status: "break", part: "Гайка накидная", operator: "Ученик 2", load: 0 },
+            { id: 10, name: "Токарный с револьверной головкой Siemens", cnc: "Siemens", group: "turning", status: "work", part: "Шкив приводной", operator: "Семенов С.", load: 75 },
+            { id: 11, name: "Токарный с револьверной головкой №2", cnc: "Fanuc", group: "turning", status: "setup", part: "Муфта соединительная", operator: "Дмитриев А.", load: 0 }
+        ];
+
+        const statusTexts = {
+            work: "В работе",
+            setup: "Наладка",
+            break: "Поломка",
+            no_mat: "Нет заготовки"
+        };
+
+        let currentActiveMachineId = null;
+
+        // Генерация плиток на экране
+        function renderShopFloor() {
+            const millingContainer = document.getElementById('milling-group');
+            const turningContainer = document.getElementById('turning-group');
+            
+            millingContainer.innerHTML = '';
+            turningContainer.innerHTML = '';
+
+            machines.forEach(m => {
+                const card = document.createElement('div');
+                card.className = 'machine-card';
+                card.setAttribute('data-status', m.status);
+                card.onclick = () => openModal(m.id);
+
+                card.innerHTML = `
+                    <div class="machine-header">
+                        <div class="machine-name">${m.name}</div>
+                        <span class="status-badge" data-status="${m.status}">${statusTexts[m.status]}</span>
+                    </div>
+                    <div class="machine-info">ЧПУ: ${m.cnc}</div>
+                    <div class="machine-info">Деталь: ${m.part || '---'}</div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" style="width: ${m.load}%; background-color: ${m.status === 'work' ? 'var(--status-work)' : '#64748b'}"></div>
+                    </div>
+                `;
+
+                if (m.group === 'milling') {
+                    millingContainer.appendChild(card);
+                } else {
+                    turningContainer.appendChild(card);
+                }
+            });
+
+            updateAnalytics();
+        }
+
+        // Обновление верхних счетчиков и OEE
+        function updateAnalytics() {
+            const counts = { work: 0, setup: 0, break: 0, no_mat: 0 };
+            let totalLoad = 0;
+
+            machines.forEach(m => {
+                counts[m.status]++;
+                if (m.status === 'work') {
+                    totalLoad += m.load;
+                }
+            });
+
+            document.getElementById('count-work').innerText = counts.work;
+            document.getElementById('count-setup').innerText = counts.setup;
+            document.getElementById('count-break').innerText = counts.break;
+            document.getElementById('count-no-mat').innerText = counts.no_mat;
+
+            // Расчет ОЕЕ цеха (упрощенная интерактивная модель)
+            // Коэффициент зависит от доли работающих станков и их текущей средней загрузки
+            let oee = 0;
+            if (machines.length > 0) {
+                const availability = (counts.work + counts.setup * 0.5) / machines.length; 
+                const performance = counts.work > 0 ? (totalLoad / counts.work) / 100 : 0;
+                const quality = 0.98; // Статичный высокий показатель качества
+                oee = Math.round(availability * performance * quality * 100);
+            }
+            
+            document.getElementById('metric-oee').innerText = oee + "%";
+        }
+
+        // Логика модального окна
+        const modalOverlay = document.getElementById('modalOverlay');
+        const statusSelect = document.getElementById('statusSelect');
+
+        function openModal(id) {
+            currentActiveMachineId = id;
+            const machine = machines.find(m => m.id === id);
+
+            document.getElementById('modalMachineName').innerText = machine.name;
+            document.getElementById('modalCNC').innerText = machine.cnc;
+            document.getElementById('modalPart').innerText = machine.part;
+            document.getElementById('modalOperator').innerText = machine.operator;
+            document.getElementById('modalLoad').innerText = machine.status === 'work' ? machine.load + "%" : "0%";
+            
+            statusSelect.value = machine.status;
+            modalOverlay.classList.add('active');
+        }
+
+        function closeModalWindow() {
+            modalOverlay.classList.remove('active');
+            currentActiveMachineId = null;
+        }
+
+        document.getElementById('closeModal').onclick = closeModalWindow;
+        modalOverlay.onclick = (e) => { if(e.target === modalOverlay) closeModalWindow(); };
+
+        // Сохранение изменений мастера
+        document.getElementById('saveStatusBtn').onclick = () => {
+            if (currentActiveMachineId !== null) {
+                const machine = machines.find(m => m.id === currentActiveMachineId);
+                const newStatus = statusSelect.value;
+                
+                machine.status = newStatus;
+                
+                // Имитация изменения нагрузки при переключении статусов
+                if (newStatus === 'work') {
+                    machine.load = machine.load || Math.floor(Math.random() * (95 - 70 + 1)) + 70; // Возвращаем рабочую нагрузку
+                } else {
+                    machine.load = 0;
+                }
+
+                renderShopFloor();
+                closeModalWindow();
+            }
+        };
+
+        // Запуск при старте
+        renderShopFloor();
+    </script>
+</body>
+</html>
