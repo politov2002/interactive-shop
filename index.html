@@ -3,17 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Интерактивный Дашборд Цеха ЧПУ</title>
+    <title>Интерактивный Цех — Живой Мониторинг</title>
     <style>
         :root {
-            --bg-color: #121824;
-            --card-bg: #1e293b;
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --bg-modal: #1e293b;
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
             --status-work: #10b981;
             --status-setup: #f59e0b;
-            --status-break: #ef4444;
-            --status-no-mat: #3b82f6;
+            --status-fail: #ef4444;
+            --status-empty: #3b82f6;
             --border-color: #334155;
         }
 
@@ -25,41 +26,54 @@
         }
 
         body {
-            background-color: var(--bg-color);
+            background-color: var(--bg-main);
             color: var(--text-main);
             padding: 20px;
+            min-height: 100vh;
         }
 
         header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 30px;
-            border-bottom: 1px solid var(--border-color);
             padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
         }
 
         h1 {
             font-size: 24px;
-            margin-bottom: 20px;
             font-weight: 600;
         }
 
-        /* Панель счетчиков */
-        .analytics-panel {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 15px;
-            margin-bottom: 10px;
+        .audio-notice {
+            background-color: #3b82f6;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            animation: pulse 2s infinite;
         }
 
-        .metric-card {
-            background: var(--card-bg);
+        /* Панель счетчиков */
+        .stats-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background-color: var(--bg-card);
             border: 1px solid var(--border-color);
-            border-radius: 10px;
             padding: 20px;
+            border-radius: 12px;
             text-align: center;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
-        .metric-card h3 {
+        .stat-card h3 {
             font-size: 14px;
             color: var(--text-muted);
             margin-bottom: 10px;
@@ -67,57 +81,52 @@
             letter-spacing: 0.5px;
         }
 
-        .metric-value {
+        .stat-card .value {
             font-size: 32px;
             font-weight: 700;
         }
 
-        #metric-oee {
-            color: #a855f7;
+        #oee-value {
+            color: var(--status-work);
         }
 
-        /* Сетка цеха */
-        .shop-floor {
-            display: grid;
-            gap: 30px;
-            margin-top: 20px;
-        }
-
-        .group-section {
-            background: rgba(30, 41, 59, 0.3);
-            border: 1px dashed var(--border-color);
-            border-radius: 12px;
-            padding: 20px;
-        }
-
-        .group-title {
+        /* Сетка станков */
+        .section-title {
             font-size: 18px;
-            margin-bottom: 15px;
             color: var(--text-muted);
-            border-left: 4px solid var(--status-no-mat);
-            padding-left: 10px;
+            margin: 25px 0 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
-        .grid-container {
+        .section-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background-color: var(--border-color);
+        }
+
+        .grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 15px;
+            gap: 20px;
         }
 
-        /* Плитка станка */
+        /* Стили плитки станка */
         .machine-card {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 15px;
+            background-color: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.3s;
             position: relative;
             overflow: hidden;
         }
 
         .machine-card:hover {
-            transform: translateY(-3px);
+            transform: translateY(-4px);
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
         }
 
@@ -128,61 +137,101 @@
             left: 0;
             width: 6px;
             height: 100%;
-            background-color: var(--status-no-mat);
+            background-color: var(--border-color);
         }
 
-        /* Динамические цвета левой полосы */
-        .machine-card[data-status="work"]::before { background-color: var(--status-work); }
-        .machine-card[data-status="setup"]::before { background-color: var(--status-setup); }
-        .machine-card[data-status="break"]::before { background-color: var(--status-break); }
-        .machine-card[data-status="no_mat"]::before { background-color: var(--status-no-mat); }
+        /* Цветовые статусы */
+        .machine-card.work::before { background-color: var(--status-work); }
+        .machine-card.setup::before { background-color: var(--status-setup); }
+        .machine-card.fail::before { background-color: var(--status-fail); }
+        .machine-card.empty::before { background-color: var(--status-empty); }
+
+        .machine-card.fail {
+            animation: border-pulse 1.5s infinite;
+        }
+
+        @keyframes border-pulse {
+            0% { border-color: var(--border-color); }
+            50% { border-color: var(--status-fail); }
+            100% { border-color: var(--border-color); }
+        }
 
         .machine-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
             margin-bottom: 12px;
-            padding-left: 5px;
         }
 
         .machine-name {
             font-weight: 600;
             font-size: 16px;
-        }
-
-        .status-badge {
-            font-size: 11px;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-
-        .status-badge[data-status="work"] { background: rgba(16, 185, 129, 0.2); color: var(--status-work); }
-        .status-badge[data-status="setup"] { background: rgba(245, 158, 11, 0.2); color: var(--status-setup); }
-        .status-badge[data-status="break"] { background: rgba(239, 68, 68, 0.2); color: var(--status-break); }
-        .status-badge[data-status="no_mat"] { background: rgba(59, 130, 246, 0.2); color: var(--status-no-mat); }
-
-        .machine-info {
-            font-size: 13px;
-            color: var(--text-muted);
-            margin-bottom: 8px;
             padding-left: 5px;
         }
 
-        .progress-bar-container {
-            background: #334155;
+        .machine-cnc {
+            font-size: 11px;
+            background-color: rgba(255,255,255,0.08);
+            padding: 3px 8px;
+            border-radius: 4px;
+            color: var(--text-muted);
+        }
+
+        .machine-status-text {
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 15px;
+            padding-left: 5px;
+        }
+
+        .work .machine-status-text { color: var(--status-work); }
+        .setup .machine-status-text { color: var(--status-setup); }
+        .fail .machine-status-text { color: var(--status-fail); }
+        .empty .machine-status-text { color: var(--status-empty); }
+
+        /* Прогресс бар загрузки */
+        .load-container {
+            margin-top: 10px;
+        }
+
+        .load-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .load-bar-bg {
+            background-color: rgba(255,255,255,0.05);
             height: 6px;
             border-radius: 3px;
-            margin-top: 10px;
             overflow: hidden;
         }
 
-        .progress-bar {
-            background: var(--status-work);
+        .load-bar-fill {
             height: 100%;
+            background-color: var(--status-work);
             width: 0%;
-            transition: width 0.4s;
+            transition: width 0.5s ease;
+        }
+        .setup .load-bar-fill { background-color: var(--status-setup); }
+        .fail .load-bar-fill { background-color: var(--status-fail); }
+        .empty .load-bar-fill { background-color: var(--status-empty); }
+
+        .machine-details-mini {
+            margin-top: 12px;
+            font-size: 12px;
+            color: var(--text-muted);
+            border-top: 1px dashed rgba(255,255,255,0.05);
+            padding-top: 8px;
+        }
+
+        .machine-details-mini div {
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* Модальное окно */
@@ -192,14 +241,15 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.7);
+            background-color: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
             display: flex;
             justify-content: center;
             align-items: center;
+            z-index: 1000;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.3s;
-            z-index: 1000;
+            transition: opacity 0.2s ease;
         }
 
         .modal-overlay.active {
@@ -208,192 +258,262 @@
         }
 
         .modal-content {
-            background: var(--card-bg);
+            background-color: var(--bg-modal);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
-            width: 100%;
+            padding: 30px;
+            border-radius: 16px;
+            width: 90%;
             max-width: 500px;
-            padding: 25px;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
             position: relative;
         }
 
         .close-btn {
             position: absolute;
-            top: 15px;
-            right: 15px;
+            top: 20px;
+            right: 20px;
+            font-size: 24px;
             background: none;
             border: none;
             color: var(--text-muted);
-            font-size: 22px;
             cursor: pointer;
+        }
+
+        .close-btn:hover {
+            color: var(--text-main);
         }
 
         .modal-title {
             font-size: 20px;
-            margin-bottom: 15px;
-            font-weight: 600;
-        }
-
-        .modal-details {
             margin-bottom: 20px;
-            font-size: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
         }
 
-        .modal-details p {
-            margin-bottom: 8px;
+        .modal-info-row {
             display: flex;
             justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 15px;
         }
 
-        .modal-details span {
+        .modal-info-label {
             color: var(--text-muted);
         }
 
-        .control-panel {
+        .modal-info-value {
+            font-weight: 500;
+        }
+
+        /* Блок управления мастером */
+        .control-block {
+            margin-top: 25px;
+            padding-top: 20px;
             border-top: 1px solid var(--border-color);
-            padding-top: 15px;
         }
 
         .control-title {
             font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 10px;
             color: var(--text-muted);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .status-select {
-            width: 100%;
+        .status-select-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .status-btn {
             padding: 10px;
-            background: var(--bg-color);
             border: 1px solid var(--border-color);
+            background-color: rgba(255,255,255,0.02);
             color: var(--text-main);
             border-radius: 6px;
-            font-size: 14px;
-            margin-bottom: 15px;
-            outline: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
         }
+
+        .status-btn:hover {
+            background-color: rgba(255,255,255,0.08);
+        }
+
+        .status-btn.active[data-status="work"] { background-color: var(--status-work); border-color: var(--status-work); color: #000; }
+        .status-btn.active[data-status="setup"] { background-color: var(--status-setup); border-color: var(--status-setup); color: #000; }
+        .status-btn.active[data-status="fail"] { background-color: var(--status-fail); border-color: var(--status-fail); color: #fff; }
+        .status-btn.active[data-status="empty"] { background-color: var(--status-empty); border-color: var(--status-empty); color: #fff; }
 
         .save-btn {
             width: 100%;
             padding: 12px;
-            background: #2563eb;
+            background-color: #3b82f6;
             color: white;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             font-weight: 600;
             cursor: pointer;
-            transition: background 0.2s;
+            font-size: 14px;
+            transition: background-color 0.2s;
         }
 
         .save-btn:hover {
-            background: #1d4ed8;
+            background-color: #2563eb;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.8; }
+            50% { opacity: 1; }
+            100% { opacity: 0.8; }
         }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>🏭 Интерактивная панель мониторинга цеха</h1>
-        
-        <!-- Верхняя аналитика -->
-        <div class="analytics-panel">
-            <div class="metric-card">
-                <h3>В работе</h3>
-                <div class="metric-value" id="count-work" style="color: var(--status-work);">0</div>
-            </div>
-            <div class="metric-card">
-                <h3>Наладка</h3>
-                <div class="metric-value" id="count-setup" style="color: var(--status-setup);">0</div>
-            </div>
-            <div class="metric-card">
-                <h3>Поломка / Авария</h3>
-                <div class="metric-value" id="count-break" style="color: var(--status-break);">0</div>
-            </div>
-            <div class="metric-card">
-                <h3>Нет заготовки</h3>
-                <div class="metric-value" id="count-no-mat" style="color: var(--status-no-mat);">0</div>
-            </div>
-            <div class="metric-card">
-                <h3>Эффективность (OEE)</h3>
-                <div class="metric-value" id="metric-oee">0%</div>
-            </div>
+        <div>
+            <h1>Интерактивный комплекс цеха станков ЧПУ</h1>
+            <p style="color: var(--text-muted); font-size: 14px; margin-top: 4px;">Мониторинг датчиков и ручное управление статусами</p>
+        </div>
+        <div class="audio-notice" id="audio-notice" onclick="initAudio()">
+            🔊 Кликните для активации звуковой сирены аварий
         </div>
     </header>
 
-    <!-- Плитки цеха -->
-    <main class="shop-floor">
-        
-        <!-- Фрезерная группа -->
-        <section class="group-section">
-            <div class="group-title">Фрезерная группа ЧПУ</div>
-            <div class="grid-container" id="milling-group"></div>
-        </section>
+    <!-- Панель KPI -->
+    <div class="stats-panel">
+        <div class="stat-card">
+            <h3>В работе</h3>
+            <div class="value" id="count-work" style="color: var(--status-work);">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>Наладка</h3>
+            <div class="value" id="count-setup" style="color: var(--status-setup);">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>Поломка / Авария</h3>
+            <div class="value" id="count-fail" style="color: var(--status-fail);">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>Нет заготовки</h3>
+            <div class="value" id="count-empty" style="color: var(--status-empty);">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>Эффективность цеха (OEE)</h3>
+            <div class="value" id="oee-value">0%</div>
+        </div>
+    </div>
 
-        <!-- Токарная группа -->
-        <section class="group-section">
-            <div class="group-title">Токарно-фрезерный комплекс и токарная группа</div>
-            <div class="grid-container" id="turning-group"></div>
-        </section>
+    <!-- Раздел Фрезерная группа -->
+    <div class="section-title">Фрезерная группа</div>
+    <div class="grid" id="milling-group"></div>
 
-    </main>
+    <!-- Раздел Токарная группа -->
+    <div class="section-title">Токарная группа</div>
+    <div class="grid" id="turning-group"></div>
 
-    <!-- Модальное окно управления -->
-    <div class="modal-overlay" id="modalOverlay">
-        <div class="modal-content">
-            <button class="close-btn" id="closeModal">&times;</button>
-            <div class="modal-title" id="modalMachineName">Название станка</div>
+    <!-- Модальное окно управления плиточкой -->
+    <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <button class="close-btn" onclick="closeModal(force=true)">&times;</button>
+            <div class="modal-title" id="modal-machine-name">Станок</div>
             
-            <div class="modal-details">
-                <p><span>ЧПУ система:</span> <strong id="modalCNC">--</strong></p>
-                <p><span>Текущая деталь:</span> <strong id="modalPart">--</strong></p>
-                <p><span>Оператор смены:</span> <strong id="modalOperator">--</strong></p>
-                <p><span>Загрузка станка:</span> <strong id="modalLoad">--</strong></p>
-            </div>
+            <div class="modal-info-row"><span class="modal-info-label">Система ЧПУ:</span><span class="modal-info-value" id="modal-cnc">--</span></div>
+            <div class="modal-info-row"><span class="modal-info-label">Текущий статус:</span><span class="modal-info-value" id="modal-status">--</span></div>
+            <div class="modal-info-row"><span class="modal-info-label">Текущая загрузка:</span><span class="modal-info-value" id="modal-load">--</span></div>
+            <div class="modal-info-row"><span class="modal-info-label">Выполняемая деталь:</span><span class="modal-info-value" id="modal-part">--</span></div>
+            <div class="modal-info-row"><span class="modal-info-label">Изготовлено деталей:</span><span class="modal-info-value" id="modal-count">--</span></div>
+            <div class="modal-info-row"><span class="modal-info-label">Оператор в смене:</span><span class="modal-info-value" id="modal-operator">--</span></div>
 
-            <div class="control-panel">
-                <div class="control-title">Управление станком (Мастер цеха)</div>
-                <select class="status-select" id="statusSelect">
-                    <option value="work">🟢 В работе</option>
-                    <option value="setup">🟡 Наладка</option>
-                    <option value="break">🔴 Поломка</option>
-                    <option value="no_mat">🔵 Нет заготовки</option>
-                </select>
-                <button class="save-btn" id="saveStatusBtn">Сохранить изменения</button>
+            <!-- Пульт мастера -->
+            <div class="control-block">
+                <div class="control-title">Управление станком (Мастер)</div>
+                <div class="status-select-grid">
+                    <button class="status-btn" data-status="work" onclick="selectModalStatus('work')">В работе</button>
+                    <button class="status-btn" data-status="setup" onclick="selectModalStatus('setup')">Наладка</button>
+                    <button class="status-btn" data-status="fail" onclick="selectModalStatus('fail')">Поломка</button>
+                    <button class="status-btn" data-status="empty" onclick="selectModalStatus('empty')">Нет заготовки</button>
+                </div>
+                <button class="save-btn" onclick="saveMachineStatus()">Сохранить изменения</button>
             </div>
         </div>
     </div>
 
     <script>
-        // Первоначальная база данных по 11 станкам цеха
+        // Инициализация базы данных станков
         const machines = [
             // Фрезерная группа
-            { id: 1, name: "3х-осевой Фрезер №1 (КНР)", cnc: "Fanuc", group: "milling", status: "work", part: "Корпус редуктора", operator: "Иванов И.", load: 85 },
-            { id: 2, name: "3х-осевой Фрезер №2 (КНР)", cnc: "Fanuc", group: "milling", status: "work", part: "Фланец переходной", operator: "Петров А.", load: 70 },
-            { id: 3, name: "3х-осевой Фрезер №3 (КНР)", cnc: "Fanuc", group: "milling", status: "setup", part: "Пресс-форма (наладка)", operator: "Сидоров К.", load: 0 },
-            { id: 4, name: "Рободрил 5ти-координатный", cnc: "Fanuc Robodrill", group: "milling", status: "work", part: "Лопатка турбины", operator: "Алексеев М.", load: 95 },
-            { id: 5, name: "Фрезерный станок 3+1 оси", cnc: "Fanuc", group: "milling", status: "no_mat", part: "Вал шлицевой", operator: "Григорьев В.", load: 0 },
+            { id: 1, group: 'milling', name: '3-х коорд. фрезер №1', cnc: 'Fanuc', status: 'work', load: 85, part: 'Корпус редуктора', count: 14, operator: 'Иванов И.' },
+            { id: 2, group: 'milling', name: '3-х коорд. фрезер №2', cnc: 'Fanuc', status: 'work', load: 78, part: 'Плита опорная', count: 22, operator: 'Петров К.' },
+            { id: 3, group: 'milling', name: '3-х коорд. фрезер №3', cnc: 'Fanuc', status: 'setup', load: 0, part: 'Наладка: Вал-шестерня', count: 0, operator: 'Сидоров А.' },
+            { id: 4, group: 'milling', name: 'Fanuc Robodrill 5-осей', cnc: 'Fanuc 31i', status: 'work', load: 92, part: 'Крыльчатка турбины', count: 3, operator: 'Федоров М.' },
+            { id: 5, group: 'milling', name: 'Фрезерный станок 3+1', cnc: 'Fanuc', status: 'empty', load: 0, part: '--', count: 41, operator: 'Иванов И.' },
             
             // Токарная группа
-            { id: 6, name: "Токарно-фрезерный с приводным инстр. (КНР)", cnc: "Fanuc", group: "turning", status: "work", part: "Штуцер фигурный", operator: "Николаев Д.", load: 80 },
-            { id: 7, name: "Okuma токарно-фрезерная", cnc: "OSP", group: "turning", status: "work", part: "Вал высокой точности", operator: "Федоров Е.", load: 90 },
-            { id: 8, name: "Токарный станок Малютка №1", cnc: "NC-201", group: "turning", status: "no_mat", part: "Болт М12 спец.", operator: "Ученик 1", load: 0 },
-            { id: 9, name: "Токарный станок Малютка №2", cnc: "NC-201", group: "turning", status: "break", part: "Гайка накидная", operator: "Ученик 2", load: 0 },
-            { id: 10, name: "Токарный с револьверной головкой Siemens", cnc: "Siemens", group: "turning", status: "work", part: "Шкив приводной", operator: "Семенов С.", load: 75 },
-            { id: 11, name: "Токарный с револьверной головкой №2", cnc: "Fanuc", group: "turning", status: "setup", part: "Муфта соединительная", operator: "Дмитриев А.", load: 0 }
+            { id: 6, group: 'turning', name: 'Кит. токарно-фрезерный (приводной)', cnc: 'Fanuc', status: 'work', load: 70, part: 'Штуцер переходной', count: 112, operator: 'Алексеев В.' },
+            { id: 7, group: 'turning', name: 'Okuma токарно-фрезерная', cnc: 'OSP-P300', status: 'work', load: 88, part: 'Вал шлицевой прециз.', count: 8, operator: 'Григорьев Д.' },
+            { id: 8, group: 'turning', name: 'Токарный станок Малютка №1', cnc: 'NC-201M', status: 'work', load: 60, part: 'Болт специальный', count: 240, operator: 'Кузнецов С.' },
+            { id: 9, group: 'turning', name: 'Токарный станок Малютка №2', cnc: 'NC-201M', status: 'empty', load: 0, part: '--', count: 180, operator: 'Кузнецов С.' },
+            { id: 10, group: 'turning', name: 'Токарный с револьверной головкой', cnc: 'Siemens 840D', status: 'fail', load: 0, part: 'Фланец зубчатый', count: 19, operator: 'Павлов Н.' },
+            { id: 11, group: 'turning', name: 'Токарный с револьверной головкой №2', cnc: 'Fanuc', status: 'work', load: 75, part: 'Муфта соединительная', count: 54, operator: 'Смирнов Е.' }
         ];
 
-        const statusTexts = {
-            work: "В работе",
-            setup: "Наладка",
-            break: "Поломка",
-            no_mat: "Нет заготовки"
+        const statusLabels = {
+            work: 'В работе',
+            setup: 'Наладка',
+            fail: 'Поломка',
+            empty: 'Нет заготовки'
         };
 
-        let currentActiveMachineId = null;
+        const randomParts = ['Корпус насоса', 'Шкив ведущий', 'Гайка ходовая', 'Втулка бронзовая', 'Ось колеса', 'Цапфа', 'Кронштейн'];
+        const randomOperators = ['Иванов И.', 'Петров К.', 'Сидоров А.', 'Федоров М.', 'Алексеев В.', 'Григорьев Д.', 'Кузнецов С.', 'Павлов Н.', 'Смирнов Е.'];
 
-        // Генерация плиток на экране
-        function renderShopFloor() {
+        let selectedMachineId = null;
+        let selectedStatusTmp = null;
+        let audioContext = null;
+        let audioEnabled = false;
+
+        // Генератор звука сирены (без внешних аудиофайлов)
+        function playAlarmSound() {
+            if (!audioEnabled) return;
+            try {
+                if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                let osc = audioContext.createOscillator();
+                let gain = audioContext.createGain();
+                
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(600, audioContext.currentTime);
+                osc.frequency.linearRampToValueAtTime(900, audioContext.currentTime + 0.3);
+                osc.frequency.linearRampToValueAtTime(600, audioContext.currentTime + 0.6);
+                
+                gain.gain.setValueAtTime(0.2, audioContext.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.6);
+                
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                
+                osc.start();
+                osc.stop(audioContext.currentTime + 0.6);
+            } catch (e) {
+                console.log("Ошибка аудио:", e);
+            }
+        }
+
+        function initAudio() {
+            audioEnabled = true;
+            document.getElementById('audio-notice').style.backgroundColor = '#10b981';
+            document.getElementById('audio-notice').innerText = '✅ Звуковая сирена активирована';
+            // Проиграем тестовый короткий звук
+            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        // Рендеринг карточек станков
+        function buildDashboard() {
             const millingContainer = document.getElementById('milling-group');
             const turningContainer = document.getElementById('turning-group');
             
@@ -402,19 +522,28 @@
 
             machines.forEach(m => {
                 const card = document.createElement('div');
-                card.className = 'machine-card';
-                card.setAttribute('data-status', m.status);
+                card.className = `machine-card ${m.status}`;
+                card.id = `machine-${m.id}`;
                 card.onclick = () => openModal(m.id);
 
                 card.innerHTML = `
                     <div class="machine-header">
                         <div class="machine-name">${m.name}</div>
-                        <span class="status-badge" data-status="${m.status}">${statusTexts[m.status]}</span>
+                        <div class="machine-cnc">${m.cnc}</div>
                     </div>
-                    <div class="machine-info">ЧПУ: ${m.cnc}</div>
-                    <div class="machine-info">Деталь: ${m.part || '---'}</div>
-                    <div class="progress-bar-container">
-                        <div class="progress-bar" style="width: ${m.load}%; background-color: ${m.status === 'work' ? 'var(--status-work)' : '#64748b'}"></div>
+                    <div class="machine-status-text" id="status-text-${m.id}">${statusLabels[m.status]}</div>
+                    <div class="load-container">
+                        <div class="load-info">
+                            <span>Загрузка</span>
+                            <span id="load-val-${m.id}">${m.load}%</span>
+                        </div>
+                        <div class="load-bar-bg">
+                            <div class="load-bar-fill" id="load-bar-${m.id}" style="width: ${m.load}%"></div>
+                        </div>
+                    </div>
+                    <div class="machine-details-mini">
+                        <div id="part-mini-${m.id}">📦 Деталь: ${m.part}</div>
+                        <div id="count-mini-${m.id}">🔢 Кол-во: ${m.count} шт.</div>
                     </div>
                 `;
 
@@ -425,87 +554,190 @@
                 }
             });
 
-            updateAnalytics();
+            updateKPIs();
         }
 
-        // Обновление верхних счетчиков и OEE
-        function updateAnalytics() {
-            const counts = { work: 0, setup: 0, break: 0, no_mat: 0 };
+        // Расчет и обновление верхних показателей цеха
+        function updateKPIs() {
+            let counts = { work: 0, setup: 0, fail: 0, empty: 0 };
             let totalLoad = 0;
+            let workingCount = 0;
 
             machines.forEach(m => {
                 counts[m.status]++;
                 if (m.status === 'work') {
                     totalLoad += m.load;
+                    workingCount++;
                 }
             });
 
             document.getElementById('count-work').innerText = counts.work;
             document.getElementById('count-setup').innerText = counts.setup;
-            document.getElementById('count-break').innerText = counts.break;
-            document.getElementById('count-no-mat').innerText = counts.no_mat;
+            document.getElementById('count-fail').innerText = counts.fail;
+            document.getElementById('count-empty').innerText = counts.empty;
 
-            // Расчет ОЕЕ цеха (упрощенная интерактивная модель)
-            // Коэффициент зависит от доли работающих станков и их текущей средней загрузки
-            let oee = 0;
-            if (machines.length > 0) {
-                const availability = (counts.work + counts.setup * 0.5) / machines.length; 
-                const performance = counts.work > 0 ? (totalLoad / counts.work) / 100 : 0;
-                const quality = 0.98; // Статичный высокий показатель качества
-                oee = Math.round(availability * performance * quality * 100);
-            }
+            // Расчет OEE на основе доли работающих станков и их средней загрузки
+            let activeRatio = workingCount / machines.length;
+            let avgLoad = workingCount > 0 ? (totalLoad / workingCount) : 0;
+            let oee = Math.round(activeRatio * avgLoad);
             
-            document.getElementById('metric-oee').innerText = oee + "%";
+            document.getElementById('oee-value').innerText = `${oee}%`;
+            
+            // Цвет текста OEE в зависимости от эффективности
+            const oeeText = document.getElementById('oee-value');
+            if (oee >= 70) oeeText.style.color = 'var(--status-work)';
+            else if (oee >= 40) oeeText.style.color = 'var(--status-setup)';
+            else oeeText.style.color = 'var(--status-fail)';
         }
 
-        // Логика модального окна
-        const modalOverlay = document.getElementById('modalOverlay');
-        const statusSelect = document.getElementById('statusSelect');
-
+        // Модальное окно: Открытие
         function openModal(id) {
-            currentActiveMachineId = id;
-            const machine = machines.find(m => m.id === id);
-
-            document.getElementById('modalMachineName').innerText = machine.name;
-            document.getElementById('modalCNC').innerText = machine.cnc;
-            document.getElementById('modalPart').innerText = machine.part;
-            document.getElementById('modalOperator').innerText = machine.operator;
-            document.getElementById('modalLoad').innerText = machine.status === 'work' ? machine.load + "%" : "0%";
+            selectedMachineId = id;
+            const m = machines.find(item => item.id === id);
             
-            statusSelect.value = machine.status;
-            modalOverlay.classList.add('active');
+            document.getElementById('modal-machine-name').innerText = m.name;
+            document.getElementById('modal-cnc').innerText = m.cnc;
+            document.getElementById('modal-status').innerText = statusLabels[m.status];
+            document.getElementById('modal-load').innerText = `${m.load}%`;
+            document.getElementById('modal-part').innerText = m.part;
+            document.getElementById('modal-count').innerText = `${m.count} шт.`;
+            document.getElementById('modal-operator').innerText = m.operator;
+
+            selectedStatusTmp = m.status;
+            updateModalStatusButtons();
+
+            document.getElementById('modal-overlay').classList.add('active');
         }
 
-        function closeModalWindow() {
-            modalOverlay.classList.remove('active');
-            currentActiveMachineId = null;
+        // Модальное окно: Закрытие
+        function closeModal(event, force = false) {
+            if (force || event.target === document.getElementById('modal-overlay')) {
+                document.getElementById('modal-overlay').classList.remove('active');
+                selectedMachineId = null;
+            }
         }
 
-        document.getElementById('closeModal').onclick = closeModalWindow;
-        modalOverlay.onclick = (e) => { if(e.target === modalOverlay) closeModalWindow(); };
+        // Выбор статуса в пульте мастера
+        function selectModalStatus(status) {
+            selectedStatusTmp = status;
+            updateModalStatusButtons();
+        }
 
-        // Сохранение изменений мастера
-        document.getElementById('saveStatusBtn').onclick = () => {
-            if (currentActiveMachineId !== null) {
-                const machine = machines.find(m => m.id === currentActiveMachineId);
-                const newStatus = statusSelect.value;
-                
-                machine.status = newStatus;
-                
-                // Имитация изменения нагрузки при переключении статусов
-                if (newStatus === 'work') {
-                    machine.load = machine.load || Math.floor(Math.random() * (95 - 70 + 1)) + 70; // Возвращаем рабочую нагрузку
-                } else {
-                    machine.load = 0;
+        function updateModalStatusButtons() {
+            document.querySelectorAll('.status-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.getAttribute('data-status') === selectedStatusTmp) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        // Сохранение изменений из пульта мастера
+        function saveMachineStatus() {
+            if (!selectedMachineId) return;
+            
+            const m = machines.find(item => item.id === selectedMachineId);
+            const oldStatus = m.status;
+            m.status = selectedStatusTmp;
+
+            // Корректируем загрузку и детали под новый статус
+            if (m.status !== 'work') {
+                m.load = 0;
+            } else if (oldStatus !== 'work') {
+                m.load = Math.floor(Math.random() * 31) + 65; // 65-95%
+                if (m.part === '--' || m.part.startsWith('Наладка:')) {
+                    m.part = randomParts[Math.floor(Math.random() * randomParts.length)];
+                }
+            }
+
+            if (m.status === 'setup' && !m.part.startsWith('Наладка:')) {
+                m.part = 'Наладка: ' + randomParts[Math.floor(Math.random() * randomParts.length)];
+            } else if (m.status === 'empty' || m.status === 'fail') {
+                m.part = '--';
+            }
+
+            // Обновляем визуал карточки
+            const card = document.getElementById(`machine-${m.id}`);
+            card.className = `machine-card ${m.status}`;
+            
+            document.getElementById(`status-text-${m.id}`).innerText = statusLabels[m.status];
+            document.getElementById(`load-val-${m.id}`).innerText = `${m.load}%`;
+            document.getElementById(`load-bar-${m.id}`).style.width = `${m.load}%`;
+            document.getElementById(`part-mini-${m.id}`).innerText = `📦 Деталь: ${m.part}`;
+
+            updateKPIs();
+            
+            if (m.status === 'fail') {
+                playAlarmSound();
+            }
+
+            closeModal(null, true);
+        }
+
+        // СИМУЛЯЦИЯ ДАТЧИКОВ (Каждые 4 секунды)
+        setInterval(() => {
+            // Выбираем 2 случайных станка для симуляции телеметрии
+            for(let i = 0; i < 2; i++) {
+                const randIndex = Math.floor(Math.random() * machines.length);
+                const m = machines[randIndex];
+
+                // Если станок открыт в модальном окне прямо сейчас — не трогаем его, чтобы мастеру не мешать
+                if (m.id === selectedMachineId) continue;
+
+                // Случайная флуктуация статуса (редкое событие — 15% шанс)
+                if (Math.random() < 0.15) {
+                    const statusOptions = ['work', 'work', 'work', 'work', 'setup', 'empty', 'fail'];
+                    const newStatus = statusOptions[Math.floor(Math.random() * statusOptions.length)];
+                    
+                    if (newStatus !== m.status) {
+                        m.status = newStatus;
+                        if (m.status === 'work') {
+                            m.load = Math.floor(Math.random() * 25) + 70; // 70-95%
+                            m.part = randomParts[Math.floor(Math.random() * randomParts.length)];
+                        } else if (m.status === 'setup') {
+                            m.load = 0;
+                            m.part = 'Наладка: ' + randomParts[Math.floor(Math.random() * randomParts.length)];
+                        } else {
+                            m.load = 0;
+                            m.part = '--';
+                        }
+
+                        // Если датчик зафиксировал новую поломку — гудит сирена
+                        if (m.status === 'fail') {
+                            playAlarmSound();
+                        }
+                    }
                 }
 
-                renderShopFloor();
-                closeModalWindow();
-            }
-        };
+                // Естественная микро-динамика датчиков для работающих станков
+                if (m.status === 'work') {
+                    // Колебание загрузки на +-5%
+                    let diff = Math.floor(Math.random() * 11) - 5;
+                    m.load = Math.max(50, Math.min(100, m.load + diff));
+                    
+                    // Счетчик деталей растет
+                    if (Math.random() < 0.4) {
+                        m.count += Math.floor(Math.random() * 2) + 1;
+                    }
+                }
 
-        // Запуск при старте
-        renderShopFloor();
+                // Обновляем визуал измененного станка на лету
+                const card = document.getElementById(`machine-${m.id}`);
+                if (card) {
+                    card.className = `machine-card ${m.status}`;
+                    document.getElementById(`status-text-${m.id}`).innerText = statusLabels[m.status];
+                    document.getElementById(`load-val-${m.id}`).innerText = `${m.load}%`;
+                    document.getElementById(`load-bar-${m.id}`).style.width = `${m.load}%`;
+                    document.getElementById(`part-mini-${m.id}`).innerText = `📦 Деталь: ${m.part}`;
+                    document.getElementById(`count-mini-${m.id}`).innerText = `🔢 Кол-во: ${m.count} шт.`;
+                }
+            }
+
+            updateKPIs();
+        }, 4000);
+
+        // Старт страницы
+        window.onload = buildDashboard;
     </script>
 </body>
 </html>
