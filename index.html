@@ -29,23 +29,37 @@
   .card.setup::before{background:var(--s)}
   .card.break::before{background:var(--b)}
   .card.no-mat::before{background:var(--n)}
+  /* Для issue — только два цвета */
+  .card.issue-ok::before{background:var(--w)}
+  .card.issue-alert::before{background:var(--b)}
   @keyframes pulse{50%{border-color:var(--b)}}
   .card.break-active{animation:pulse 2s infinite}
+  .card.issue-alert{animation:pulse 2s infinite}
   .ch{display:flex;justify-content:space-between;gap:10px;margin-bottom:10px;font-weight:bold;font-size:.95rem}
   .ch > div:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
   .row{display:flex;justify-content:space-between;gap:10px;font-size:.85rem;margin-bottom:4px;color:var(--m)}
   .row span:last-child{color:var(--t);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
+  .note-preview{margin-top:8px;font-size:.82rem;color:#cbd5e1;background:#0f172a;border:1px solid var(--brd);border-radius:6px;padding:8px;white-space:pre-wrap;word-break:break-word;max-height:110px;overflow:hidden;position:relative}
+  .note-preview::after{content:'';position:absolute;bottom:0;left:0;right:0;height:24px;background:linear-gradient(transparent,#0f172a)}
   .ov{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;justify-content:center;align-items:center;z-index:9;padding:15px}
   .ov.active{display:flex}
-  .modal{background:#1e1e24;border:1px solid var(--brd);padding:20px;border-radius:12px;width:100%;max-width:380px}
+  .modal{background:#1e1e24;border:1px solid var(--brd);padding:20px;border-radius:12px;width:100%;max-width:420px}
   .modal .ch{margin-bottom:15px}
   .fg{margin-bottom:10px}
   .fg label{display:block;font-size:.8rem;color:var(--m);margin-bottom:4px}
-  .fg select,.fg input{width:100%;background:#0f172a;border:1px solid var(--brd);padding:8px;border-radius:6px;color:#fff;outline:none;font-size:.9rem}
-  .fg select:focus,.fg input:focus{border-color:#6366f1}
+  .fg select,.fg input,.fg textarea{width:100%;background:#0f172a;border:1px solid var(--brd);padding:8px;border-radius:6px;color:#fff;outline:none;font-size:.9rem;font-family:inherit}
+  .fg textarea{min-height:140px;resize:vertical}
+  .fg select:focus,.fg input:focus,.fg textarea:focus{border-color:#6366f1}
   .btn{width:100%;background:#4f46e5;color:#fff;border:none;padding:10px;border-radius:6px;font-weight:bold;cursor:pointer;margin-top:10px;font-size:.95rem}
   .btn:hover{background:#4338ca}
   .btn:disabled{opacity:.6;cursor:wait}
+  .status-toggle{display:flex;gap:10px}
+  .status-toggle label{flex:1;cursor:pointer;display:block}
+  .status-toggle input{display:none}
+  .status-toggle .opt{padding:10px;text-align:center;border:2px solid var(--brd);border-radius:8px;font-weight:600;font-size:.9rem;transition:all .15s}
+  .status-toggle input:checked + .opt.ok{border-color:var(--w);background:rgba(16,185,129,.12);color:var(--w)}
+  .status-toggle input:checked + .opt.alert{border-color:var(--b);background:rgba(239,68,68,.12);color:var(--b)}
+  .status-toggle .opt:hover{border-color:#64748b}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#ef4444;color:#fff;padding:10px 18px;border-radius:8px;font-size:.85rem;z-index:20;opacity:0;transition:opacity .3s;pointer-events:none}
   .toast.show{opacity:1}
 </style>
@@ -68,24 +82,51 @@
 
 <div class="grid" id="g"></div>
 
+<!-- Универсальная модалка -->
 <div class="ov" id="ov" onclick="if(event.target===this)closeM()">
   <div class="modal">
     <div class="ch">
       <span id="mt">Станок</span>
       <button style="background:none;border:none;color:#fff;cursor:pointer;font-size:1.2rem" onclick="closeM()" aria-label="Закрыть">&times;</button>
     </div>
-    <div class="fg">
-      <label>Статус</label>
-      <select id="fst">
-        <option value="work">🟢 В работе / Норма</option>
-        <option value="setup">🟡 Наладка / Обсуждение</option>
-        <option value="break">🔴 Поломка / Внимание</option>
-        <option value="no-mat">🔵 Нет заготовки / Ожидание</option>
-      </select>
+
+    <!-- Блок для станков -->
+    <div id="machineFields">
+      <div class="fg">
+        <label>Статус</label>
+        <select id="fst">
+          <option value="work">🟢 В работе / Норма</option>
+          <option value="setup">🟡 Наладка / Обсуждение</option>
+          <option value="break">🔴 Поломка / Внимание</option>
+          <option value="no-mat">🔵 Нет заготовки / Ожидание</option>
+        </select>
+      </div>
+      <div class="fg"><label id="lbl-part">Изготавливаемая деталь:</label><input type="text" id="fp"></div>
+      <div class="fg"><label id="lbl-count">Количество (шт):</label><input type="number" id="fc" min="0"></div>
+      <div class="fg"><label id="lbl-load">Текущая загрузка (%):</label><input type="number" id="fl" min="0" max="100"></div>
     </div>
-    <div class="fg"><label id="lbl-part">Деталь</label><input type="text" id="fp"></div>
-    <div class="fg"><label id="lbl-count">Количество</label><input type="number" id="fc" min="0"></div>
-    <div class="fg"><label id="lbl-load">Загрузка (%)</label><input type="number" id="fl" min="0" max="100"></div>
+
+    <!-- Блок для производственных вопросов (блокнот) -->
+    <div id="issueFields" style="display:none">
+      <div class="fg">
+        <label>Индикация</label>
+        <div class="status-toggle">
+          <label>
+            <input type="radio" name="issueStatus" value="ok">
+            <div class="opt ok">🟢 Норма / Решено</div>
+          </label>
+          <label>
+            <input type="radio" name="issueStatus" value="alert">
+            <div class="opt alert">🔴 Внимание / Проблема</div>
+          </label>
+        </div>
+      </div>
+      <div class="fg">
+        <label>Блокнот (заметки, задачи, комментарии)</label>
+        <textarea id="fnote" placeholder="Введите текст..."></textarea>
+      </div>
+    </div>
+
     <button class="btn" id="saveBtn" onclick="saveM()">Сохранить в базу</button>
   </div>
 </div>
@@ -96,8 +137,7 @@
 /* ============================================================
    НАСТРОЙКИ FIREBASE
    Замените PROJECT_ID на ID вашего проекта Firebase.
-   Если оставить 'demo' — приложение работает на демо-данных
-   (изменения сохраняются только в текущей вкладке).
+   Если оставить 'demo' — приложение работает на демо-данных.
    ============================================================ */
 const PROJECT_ID = "demo";
 const USE_FIREBASE = PROJECT_ID !== "demo";
@@ -119,8 +159,8 @@ const initialData = {
   9:  {id:9,  name:"Токарный станок Малютка №2",         type:"turning", cnc:"NC-201",  status:"no-mat", part:"Ожидание",               count:80,  load:0},
   10: {id:10, name:"Токарный с револьверной головкой Siemens", type:"turning", cnc:"Siemens", status:"work", part:"Муфта муфтовая",     count:24,  load:82},
   11: {id:11, name:"Токарный с револьверной головкой",   type:"turning", cnc:"ЧПУ",     status:"break",  part:"Сбой привода",           count:11,  load:0},
-  12: {id:12, name:"Фрезерная группа",                   type:"issue",   cnc:"Вопросы", status:"work",   part:"Обеспечение инструментом", count:2, load:40},
-  13: {id:13, name:"Токарная группа",                    type:"issue",   cnc:"Вопросы", status:"setup",  part:"Контроль деталей ОТК",   count:5,   load:60}
+  12: {id:12, name:"Фрезерная группа",                   type:"issue",   cnc:"Вопросы", status:"ok",    note:"Требуется поставка фрез Ø12 — 5 шт.\nОжидаем отклик от снабжения."},
+  13: {id:13, name:"Токарная группа",                    type:"issue",   cnc:"Вопросы", status:"alert", note:"ОТК выявило отклонение по 3 деталям.\nНужна внеплановая проверка партии."}
 };
 
 /* ============================================================
@@ -128,7 +168,8 @@ const initialData = {
    ============================================================ */
 let macs = [];
 let curId = null;
-let localDemo = JSON.parse(JSON.stringify(initialData)); // локальный fallback
+let curType = null;
+let localDemo = JSON.parse(JSON.stringify(initialData));
 
 /* ============================================================
    УТИЛИТЫ
@@ -153,6 +194,7 @@ function toast(msg){
 async function loadData() {
   if (!USE_FIREBASE) {
     macs = Object.values(localDemo);
+    macs.sort((a,b)=>a.id-b.id);
     render();
     return;
   }
@@ -169,8 +211,8 @@ async function loadData() {
     render();
   } catch (e) {
     console.error("loadData error:", e);
-    // Fallback на демо-данные, чтобы страница не была пустой
     macs = Object.values(localDemo);
+    macs.sort((a,b)=>a.id-b.id);
     render();
   }
 }
@@ -197,21 +239,37 @@ function render(){
     }
 
     const c = document.createElement('div');
+    c.onclick = () => openM(m.id);
+
+    // ================= ISSUE-КАРТОЧКА =================
+    if (m.type === 'issue') {
+      const isAlert = m.status === 'alert';
+      c.className = `card ${isAlert ? 'issue-alert' : 'issue-ok'}`;
+      if (isAlert) c.classList.add('break-active');
+
+      const label = isAlert ? '🔴 Внимание' : '🟢 Норма';
+      const note = m.note || '';
+
+      c.innerHTML = `
+        <div class="ch">
+          <div>${esc(m.name)}</div>
+          <div style="font-size:0.75rem;color:var(--m);font-weight:400">${esc(m.cnc)}</div>
+        </div>
+        <div style="font-size:0.85rem;font-weight:bold;margin-bottom:6px">${label}</div>
+        ${note ? `<div class="note-preview">${esc(note)}</div>` : `<div style="font-size:.8rem;color:var(--m);font-style:italic">Заметок нет</div>`}
+      `;
+      grid.appendChild(c);
+      return;
+    }
+
+    // ================= КАРТОЧКА СТАНКА =================
     c.className = `card ${m.status}`;
     if (m.status === 'break') c.classList.add('break-active');
-    c.onclick = () => openM(m.id);
 
     let lbl = m.status==='work' ? '🟢 В работе'
             : m.status==='setup' ? '🟡 Наладка'
             : m.status==='break' ? '🔴 Поломка'
             : '🔵 Нет заготовки';
-
-    if (m.type === 'issue') {
-      lbl = m.status==='work' ? '🟢 Норма'
-          : m.status==='setup' ? '🟡 Обсуждение'
-          : m.status==='break' ? '🔴 Внимание'
-          : '🔵 Ожидание';
-    }
 
     c.innerHTML = `
       <div class="ch">
@@ -219,13 +277,13 @@ function render(){
         <div style="font-size:0.75rem;color:var(--m);font-weight:400">${esc(m.cnc)}</div>
       </div>
       <div style="font-size:0.8rem;font-weight:bold;margin-bottom:8px">${lbl}</div>
-      <div class="row"><span>${m.type==='issue'?'Задача:':'Деталь:'}</span><span>${esc(m.part)}</span></div>
-      <div class="row"><span>${m.type==='issue'?'Задач:':'Готово:'}</span><span>${esc(m.count)} ${m.type==='issue'?'активно':'шт'}</span></div>
-      <div class="row"><span>${m.type==='issue'?'Приоритет:':'Загрузка:'}</span><span>${esc(m.load)}%</span></div>`;
+      <div class="row"><span>Деталь:</span><span>${esc(m.part)}</span></div>
+      <div class="row"><span>Готово:</span><span>${esc(m.count)} шт</span></div>
+      <div class="row"><span>Загрузка:</span><span>${esc(m.load)}%</span></div>`;
     grid.appendChild(c);
   });
 
-  // Статистика по станкам (без учёта "вопросов")
+  // Статистика по станкам (без issue)
   const machines = macs.filter(m=>m.type!=='issue');
   const w = machines.filter(m=>m.status==='work').length;
   const s = machines.filter(m=>m.status==='setup').length;
@@ -235,7 +293,6 @@ function render(){
   document.getElementById('sc').textContent = s;
   document.getElementById('bc').textContent = b;
 
-  // OEE: средняя загрузка работающих × доля исправных станков
   let sumLoad = 0, working = 0;
   machines.forEach(m=>{
     if (m.status==='work') { sumLoad += Number(m.load)||0; working++; }
@@ -255,16 +312,29 @@ function openM(id){
   curId = id;
   const m = macs.find(x=>x.id===id);
   if (!m) return;
-
-  document.getElementById('lbl-part').textContent  = m.type==='issue' ? "Тема вопроса / Задача:" : "Изготавливаемая деталь:";
-  document.getElementById('lbl-count').textContent = m.type==='issue' ? "Количество активных задач:" : "Количество (шт):";
-  document.getElementById('lbl-load').textContent  = m.type==='issue' ? "Важность / Приоритет (%):" : "Текущая загрузка (%):";
+  curType = m.type;
 
   document.getElementById('mt').textContent = m.name;
-  document.getElementById('fst').value = m.status;
-  document.getElementById('fp').value  = m.part;
-  document.getElementById('fc').value  = m.count;
-  document.getElementById('fl').value  = m.load;
+
+  const machineFields = document.getElementById('machineFields');
+  const issueFields   = document.getElementById('issueFields');
+
+  if (m.type === 'issue') {
+    machineFields.style.display = 'none';
+    issueFields.style.display = 'block';
+
+    const radios = document.getElementsByName('issueStatus');
+    radios.forEach(r => r.checked = (r.value === (m.status === 'alert' ? 'alert' : 'ok')));
+    document.getElementById('fnote').value = m.note || '';
+  } else {
+    machineFields.style.display = 'block';
+    issueFields.style.display = 'none';
+
+    document.getElementById('fst').value = m.status;
+    document.getElementById('fp').value  = m.part;
+    document.getElementById('fc').value  = m.count;
+    document.getElementById('fl').value  = m.load;
+  }
 
   document.getElementById('ov').classList.add('active');
 }
@@ -272,6 +342,7 @@ function openM(id){
 function closeM(){
   document.getElementById('ov').classList.remove('active');
   curId = null;
+  curType = null;
 }
 
 /* ============================================================
@@ -281,15 +352,24 @@ async function saveM(){
   if (curId === null) return;
 
   const btn = document.getElementById('saveBtn');
-  const updates = {
-    status: document.getElementById('fst').value,
-    part:   document.getElementById('fp').value.trim(),
-    count:  parseInt(document.getElementById('fc').value, 10) || 0,
-    load:   Math.max(0, Math.min(100, parseInt(document.getElementById('fl').value, 10) || 0))
-  };
+  let updates = {};
+
+  if (curType === 'issue') {
+    const selected = document.querySelector('input[name="issueStatus"]:checked');
+    updates = {
+      status: selected ? selected.value : 'ok',
+      note:   document.getElementById('fnote').value
+    };
+  } else {
+    updates = {
+      status: document.getElementById('fst').value,
+      part:   document.getElementById('fp').value.trim(),
+      count:  parseInt(document.getElementById('fc').value, 10) || 0,
+      load:   Math.max(0, Math.min(100, parseInt(document.getElementById('fl').value, 10) || 0))
+    };
+  }
 
   if (!USE_FIREBASE) {
-    // Локальное сохранение (демо-режим)
     localDemo[curId] = { ...localDemo[curId], ...updates };
     closeM();
     await loadData();
@@ -340,7 +420,6 @@ async function resetToDemo(){
 loadData();
 if (USE_FIREBASE) setInterval(loadData, 5000);
 
-// Закрытие модалки по Esc
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeM(); });
 </script>
 </body>
