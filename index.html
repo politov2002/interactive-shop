@@ -19,10 +19,7 @@ header{text-align:center;margin-bottom:20px}
 .fg{margin-bottom:10px}.fg label{display:block;font-size:0.8rem;color:var(--m);margin-bottom:4px}
 .fg select,.fg input{width:100%;background:#0f172a;border:1px solid var(--brd);padding:8px;border-radius:6px;color:#fff;outline:none}
 .btn{width:100%;background:#4f46e5;color:#fff;border:none;padding:10px;border-radius:6px;font-weight:bold;cursor:pointer;margin-top:10px}
-</style>
-<script src="https://gstatic.com"></script>
-<script src="https://gstatic.com"></script>
-</head><body>
+</style></head><body>
 <header><h1>🏭 Центральный Ситуационный Центр</h1><div class="stats">
 <div class="st-card"><h3>В работе</h3><div class="val" style="color:var(--w)" id="wc">0</div></div>
 <div class="st-card"><h3>Наладка</h3><div class="val" style="color:var(--s)" id="sc">0</div></div>
@@ -36,17 +33,7 @@ header{text-align:center;margin-bottom:20px}
 <div class="fg"><label id="lbl-load">Загрузка (%)</label><input type="number" id="fl" min="0" max="100"></div>
 <button class="btn" onclick="saveM()">Сохранить в базу</button></div></div>
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyD7IyidqpsQNxOyIO-gXiC2Y0iTgfGuBEw",
-  authDomain: "://firebaseapp.com",
-  databaseURL: "https://firebaseio.com",
-  projectId: "nahabino-d8803",
-  storageBucket: "nahabino-d8803.firebasestorage.app",
-  messagingSenderId: "523106922724",
-  appId: "1:523106922724:web:daa409b569cb12653b3cf1"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+const url = "https://firebaseio.com";
 let macs = []; let curId = null;
 
 const initialData = {
@@ -65,11 +52,17 @@ const initialData = {
   13:{id:13,name:"Токарная группа",type:"issue",cnc:"Вопросы",status:"setup",part:"Контроль деталей ОТК",count:5,load:60}
 };
 
-db.ref('machines').on('value', (snapshot) => {
-    const data = snapshot.val();
-    if (!data) { db.ref('machines').set(initialData); return; }
-    macs = Object.values(data); render();
-});
+async function loadData() {
+    try {
+        const response = await fetch(url);
+        let data = await response.json();
+        if (!data) {
+            await fetch(url, { method: "PUT", body: JSON.stringify(initialData) });
+            data = initialData;
+        }
+        macs = Object.values(data); render();
+    } catch (e) { console.error(e); }
+}
 
 function render(){
     const grid=document.getElementById('g');grid.innerHTML='';let grp='';
@@ -99,9 +92,16 @@ function openM(id){
     document.getElementById('ov').style.display='flex';
 }
 function closeM(){document.getElementById('ov').style.display='none';curId=null}
-function saveM(){
+async function saveM(){
     if(curId===null)return;
+    const updateUrl = `https://firebaseio.com{curId}.json`;
     const updates={status:document.getElementById('fst').value,part:document.getElementById('fp').value,count:parseInt(document.getElementById('fc').value)||0,load:parseInt(document.getElementById('fl').value)||0};
-    db.ref('machines/'+curId).update(updates);closeM();
+    closeM();
+    try {
+        await fetch(updateUrl, { method: "PATCH", body: JSON.stringify(updates) });
+        loadData();
+    } catch(e) { console.error(e); }
 }
+loadData();
+setInterval(loadData, 3000);
 </script></body></html>
