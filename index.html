@@ -1,51 +1,198 @@
-<script>
-// ⚠️ ЗАМЕНИТЕ your-project-id на ID вашего Firebase-проекта
-const BASE = "https://your-project-id.firebaseio.com";
-const url = BASE + "/.json";
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Центральный Ситуационный Центр</title>
+<style>
+  :root{
+    --bg:#121214; --c:#1e1e24; --t:#f0faf2; --m:#94a3b8;
+    --w:#10b981; --s:#f59e0b; --b:#ef4444; --n:#3b82f6; --brd:#334155;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  body{background:var(--bg);color:var(--t);padding:20px;min-height:100vh}
+  header{text-align:center;margin-bottom:20px}
+  header h1{font-size:clamp(1.1rem,2.5vw,1.8rem)}
+  .stats{display:flex;gap:15px;margin-top:15px;justify-content:center;flex-wrap:wrap}
+  .st-card{background:var(--c);border:1px solid var(--brd);padding:10px 20px;border-radius:10px;text-align:center;min-width:110px}
+  .st-card h3{font-size:.75rem;color:var(--m);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+  .val{font-size:1.5rem;font-weight:700}
+  .toolbar{display:flex;justify-content:center;gap:10px;margin-bottom:15px;flex-wrap:wrap}
+  .toolbar button{background:#1e293b;color:#cbd5e1;border:1px solid var(--brd);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.8rem}
+  .toolbar button:hover{background:#334155}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px}
+  .gt{grid-column:1/-1;margin:15px 0 5px;color:var(--m);border-left:4px solid #64748b;padding-left:10px;font-size:1rem}
+  .card{background:var(--c);border:2px solid var(--brd);border-radius:12px;padding:15px;cursor:pointer;position:relative;transition:transform .12s,border-color .12s}
+  .card:hover{transform:translateY(-2px);border-color:#475569}
+  .card::before{content:'';position:absolute;top:0;left:0;width:100%;height:5px;border-radius:12px 12px 0 0}
+  .card.work::before{background:var(--w)}
+  .card.setup::before{background:var(--s)}
+  .card.break::before{background:var(--b)}
+  .card.no-mat::before{background:var(--n)}
+  @keyframes pulse{50%{border-color:var(--b)}}
+  .card.break-active{animation:pulse 2s infinite}
+  .ch{display:flex;justify-content:space-between;gap:10px;margin-bottom:10px;font-weight:bold;font-size:.95rem}
+  .ch > div:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .row{display:flex;justify-content:space-between;gap:10px;font-size:.85rem;margin-bottom:4px;color:var(--m)}
+  .row span:last-child{color:var(--t);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
+  .ov{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;justify-content:center;align-items:center;z-index:9;padding:15px}
+  .ov.active{display:flex}
+  .modal{background:#1e1e24;border:1px solid var(--brd);padding:20px;border-radius:12px;width:100%;max-width:380px}
+  .modal .ch{margin-bottom:15px}
+  .fg{margin-bottom:10px}
+  .fg label{display:block;font-size:.8rem;color:var(--m);margin-bottom:4px}
+  .fg select,.fg input{width:100%;background:#0f172a;border:1px solid var(--brd);padding:8px;border-radius:6px;color:#fff;outline:none;font-size:.9rem}
+  .fg select:focus,.fg input:focus{border-color:#6366f1}
+  .btn{width:100%;background:#4f46e5;color:#fff;border:none;padding:10px;border-radius:6px;font-weight:bold;cursor:pointer;margin-top:10px;font-size:.95rem}
+  .btn:hover{background:#4338ca}
+  .btn:disabled{opacity:.6;cursor:wait}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#ef4444;color:#fff;padding:10px 18px;border-radius:8px;font-size:.85rem;z-index:20;opacity:0;transition:opacity .3s;pointer-events:none}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
 
+<header>
+  <h1>🏭 Центральный Ситуационный Центр</h1>
+  <div class="stats">
+    <div class="st-card"><h3>В работе</h3><div class="val" style="color:var(--w)" id="wc">0</div></div>
+    <div class="st-card"><h3>Наладка</h3><div class="val" style="color:var(--s)" id="sc">0</div></div>
+    <div class="st-card"><h3>Поломка</h3><div class="val" style="color:var(--b)" id="bc">0</div></div>
+    <div class="st-card"><h3>OEE Цеха</h3><div class="val" style="color:#60a5fa" id="oee">0%</div></div>
+  </div>
+</header>
+
+<div class="toolbar">
+  <button onclick="resetToDemo()">↺ Сбросить в демо-данные</button>
+</div>
+
+<div class="grid" id="g"></div>
+
+<div class="ov" id="ov" onclick="if(event.target===this)closeM()">
+  <div class="modal">
+    <div class="ch">
+      <span id="mt">Станок</span>
+      <button style="background:none;border:none;color:#fff;cursor:pointer;font-size:1.2rem" onclick="closeM()" aria-label="Закрыть">&times;</button>
+    </div>
+    <div class="fg">
+      <label>Статус</label>
+      <select id="fst">
+        <option value="work">🟢 В работе / Норма</option>
+        <option value="setup">🟡 Наладка / Обсуждение</option>
+        <option value="break">🔴 Поломка / Внимание</option>
+        <option value="no-mat">🔵 Нет заготовки / Ожидание</option>
+      </select>
+    </div>
+    <div class="fg"><label id="lbl-part">Деталь</label><input type="text" id="fp"></div>
+    <div class="fg"><label id="lbl-count">Количество</label><input type="number" id="fc" min="0"></div>
+    <div class="fg"><label id="lbl-load">Загрузка (%)</label><input type="number" id="fl" min="0" max="100"></div>
+    <button class="btn" id="saveBtn" onclick="saveM()">Сохранить в базу</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   НАСТРОЙКИ FIREBASE
+   Замените PROJECT_ID на ID вашего проекта Firebase.
+   Если оставить 'demo' — приложение работает на демо-данных
+   (изменения сохраняются только в текущей вкладке).
+   ============================================================ */
+const PROJECT_ID = "demo";
+const USE_FIREBASE = PROJECT_ID !== "demo";
+const BASE = USE_FIREBASE ? `https://${PROJECT_ID}-default-rtdb.firebaseio.com` : null;
+const ROOT_URL = USE_FIREBASE ? `${BASE}/.json` : null;
+
+/* ============================================================
+   ДЕМО-ДАННЫЕ
+   ============================================================ */
+const initialData = {
+  1:  {id:1,  name:"Фрезерный 3Х Китай №1",              type:"milling", cnc:"Fanuc",   status:"work",   part:"Корпус редуктора",       count:14,  load:85},
+  2:  {id:2,  name:"Фрезерный 3Х Китай №2",              type:"milling", cnc:"Fanuc",   status:"work",   part:"Фланец А3",              count:32,  load:78},
+  3:  {id:3,  name:"Фрезерный 3Х Китай №3",              type:"milling", cnc:"Fanuc",   status:"setup",  part:"Переналадка",            count:0,   load:0},
+  4:  {id:4,  name:"Рободрил 5-ти координатный",         type:"milling", cnc:"Fanuc",   status:"work",   part:"Лопатка турбины",        count:3,   load:92},
+  5:  {id:5,  name:"Фрезерный 3+1 координатный",         type:"milling", cnc:"Fanuc",   status:"no-mat", part:"Ожидание",               count:45,  load:0},
+  6:  {id:6,  name:"Китайский Токарно-Фрезерный",        type:"turning", cnc:"Fanuc",   status:"work",   part:"Вал приводной",          count:19,  load:70},
+  7:  {id:7,  name:"Okuma Токарно-Фрезерная",            type:"turning", cnc:"OSP",     status:"work",   part:"Шпиндель точный",        count:8,   load:88},
+  8:  {id:8,  name:"Токарный станок Малютка №1",         type:"turning", cnc:"NC-201",  status:"work",   part:"Шпилька М12",            count:142, load:50},
+  9:  {id:9,  name:"Токарный станок Малютка №2",         type:"turning", cnc:"NC-201",  status:"no-mat", part:"Ожидание",               count:80,  load:0},
+  10: {id:10, name:"Токарный с револьверной головкой Siemens", type:"turning", cnc:"Siemens", status:"work", part:"Муфта муфтовая",     count:24,  load:82},
+  11: {id:11, name:"Токарный с револьверной головкой",   type:"turning", cnc:"ЧПУ",     status:"break",  part:"Сбой привода",           count:11,  load:0},
+  12: {id:12, name:"Фрезерная группа",                   type:"issue",   cnc:"Вопросы", status:"work",   part:"Обеспечение инструментом", count:2, load:40},
+  13: {id:13, name:"Токарная группа",                    type:"issue",   cnc:"Вопросы", status:"setup",  part:"Контроль деталей ОТК",   count:5,   load:60}
+};
+
+/* ============================================================
+   СОСТОЯНИЕ
+   ============================================================ */
 let macs = [];
 let curId = null;
+let localDemo = JSON.parse(JSON.stringify(initialData)); // локальный fallback
 
-const initialData = { /* ... без изменений ... */ };
-
-// экранирование HTML
+/* ============================================================
+   УТИЛИТЫ
+   ============================================================ */
 function esc(s){
   return String(s ?? "").replace(/[&<>"']/g, c => ({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[c]));
 }
 
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>el.classList.remove('show'), 3000);
+}
+
+/* ============================================================
+   ЗАГРУЗКА ДАННЫХ
+   ============================================================ */
 async function loadData() {
+  if (!USE_FIREBASE) {
+    macs = Object.values(localDemo);
+    render();
+    return;
+  }
   try {
-    const response = await fetch(url);
+    const response = await fetch(ROOT_URL);
     if (!response.ok) throw new Error("HTTP " + response.status);
     let data = await response.json();
     if (!data) {
-      await fetch(url, { method: "PUT", body: JSON.stringify(initialData) });
+      await fetch(ROOT_URL, { method: "PUT", body: JSON.stringify(initialData) });
       data = initialData;
     }
-    macs = Object.values(data);
+    macs = Object.values(data).filter(Boolean);
+    macs.sort((a,b)=>a.id-b.id);
     render();
   } catch (e) {
     console.error("loadData error:", e);
+    // Fallback на демо-данные, чтобы страница не была пустой
+    macs = Object.values(localDemo);
+    render();
   }
 }
 
+/* ============================================================
+   РЕНДЕР
+   ============================================================ */
 function render(){
   const grid = document.getElementById('g');
   grid.innerHTML = '';
   let grp = '';
 
   macs.forEach(m=>{
-    let gName = m.type==='milling' ? 'Фрезерная группа'
-              : m.type==='turning' ? 'Токарная группа'
-              : 'Производственные вопросы';
+    const gName = m.type==='milling' ? 'Фрезерная группа'
+                : m.type==='turning' ? 'Токарная группа'
+                : 'Производственные вопросы';
 
     if (grp !== gName) {
       grp = gName;
       const t = document.createElement('h2');
       t.className = 'gt';
-      t.innerText = grp;
+      t.textContent = grp;
       grid.appendChild(t);
     }
 
@@ -54,93 +201,147 @@ function render(){
     if (m.status === 'break') c.classList.add('break-active');
     c.onclick = () => openM(m.id);
 
-    let lbl = m.status==='work' ? 'В работе'
-            : m.status==='setup' ? 'Наладка'
-            : m.status==='break' ? 'Поломка'
-            : 'Нет заготовки';
+    let lbl = m.status==='work' ? '🟢 В работе'
+            : m.status==='setup' ? '🟡 Наладка'
+            : m.status==='break' ? '🔴 Поломка'
+            : '🔵 Нет заготовки';
 
     if (m.type === 'issue') {
-      lbl = m.status==='work' ? 'Норма'
-          : m.status==='setup' ? 'Обсуждение'
-          : m.status==='break' ? 'Внимание'
-          : 'Ожидание';
+      lbl = m.status==='work' ? '🟢 Норма'
+          : m.status==='setup' ? '🟡 Обсуждение'
+          : m.status==='break' ? '🔴 Внимание'
+          : '🔵 Ожидание';
     }
 
     c.innerHTML = `
       <div class="ch">
         <div>${esc(m.name)}</div>
-        <div style="font-size:0.75rem;color:var(--m)">${esc(m.cnc)}</div>
+        <div style="font-size:0.75rem;color:var(--m);font-weight:400">${esc(m.cnc)}</div>
       </div>
-      <div class="st-t" style="font-size:0.8rem;font-weight:bold;margin-bottom:8px">${lbl}</div>
+      <div style="font-size:0.8rem;font-weight:bold;margin-bottom:8px">${lbl}</div>
       <div class="row"><span>${m.type==='issue'?'Задача:':'Деталь:'}</span><span>${esc(m.part)}</span></div>
       <div class="row"><span>${m.type==='issue'?'Задач:':'Готово:'}</span><span>${esc(m.count)} ${m.type==='issue'?'активно':'шт'}</span></div>
       <div class="row"><span>${m.type==='issue'?'Приоритет:':'Загрузка:'}</span><span>${esc(m.load)}%</span></div>`;
     grid.appendChild(c);
   });
 
-  const w = macs.filter(m=>m.type!=='issue' && m.status==='work').length;
-  const s = macs.filter(m=>m.type!=='issue' && m.status==='setup').length;
-  const b = macs.filter(m=>m.type!=='issue' && m.status==='break').length;
+  // Статистика по станкам (без учёта "вопросов")
+  const machines = macs.filter(m=>m.type!=='issue');
+  const w = machines.filter(m=>m.status==='work').length;
+  const s = machines.filter(m=>m.status==='setup').length;
+  const b = machines.filter(m=>m.status==='break').length;
 
-  document.getElementById('wc').innerText = w;
-  document.getElementById('sc').innerText = s;
-  document.getElementById('bc').innerText = b;
+  document.getElementById('wc').textContent = w;
+  document.getElementById('sc').textContent = s;
+  document.getElementById('bc').textContent = b;
 
-  let tL = 0, wM = 0;
-  macs.forEach(m=>{
-    if (m.type!=='issue' && m.status==='work') { tL += m.load; wM++; }
+  // OEE: средняя загрузка работающих × доля исправных станков
+  let sumLoad = 0, working = 0;
+  machines.forEach(m=>{
+    if (m.status==='work') { sumLoad += Number(m.load)||0; working++; }
   });
-
-  let oee = wM > 0 ? Math.round((tL/wM) * (1 - (b/11))) : 0;
+  const total = machines.length || 1;
+  const availability = 1 - b/total;
+  const avgLoad = working > 0 ? sumLoad/working : 0;
+  let oee = Math.round(avgLoad * availability);
   oee = Math.max(0, Math.min(100, oee));
-  document.getElementById('oee').innerText = oee + '%';
+  document.getElementById('oee').textContent = oee + '%';
 }
 
+/* ============================================================
+   МОДАЛКА
+   ============================================================ */
 function openM(id){
   curId = id;
   const m = macs.find(x=>x.id===id);
   if (!m) return;
 
-  document.getElementById('lbl-part').innerText  = m.type==='issue' ? "Тема вопроса / Задача:" : "Изготавливаемая деталь:";
-  document.getElementById('lbl-count').innerText = m.type==='issue' ? "Количество активных задач:" : "Количество (шт):";
-  document.getElementById('lbl-load').innerText  = m.type==='issue' ? "Важность / Приоритет (%):" : "Текущая загрузка (%):";
+  document.getElementById('lbl-part').textContent  = m.type==='issue' ? "Тема вопроса / Задача:" : "Изготавливаемая деталь:";
+  document.getElementById('lbl-count').textContent = m.type==='issue' ? "Количество активных задач:" : "Количество (шт):";
+  document.getElementById('lbl-load').textContent  = m.type==='issue' ? "Важность / Приоритет (%):" : "Текущая загрузка (%):";
 
-  document.getElementById('mt').innerText = m.name;
+  document.getElementById('mt').textContent = m.name;
   document.getElementById('fst').value = m.status;
   document.getElementById('fp').value  = m.part;
   document.getElementById('fc').value  = m.count;
   document.getElementById('fl').value  = m.load;
 
-  document.getElementById('ov').style.display = 'flex';
+  document.getElementById('ov').classList.add('active');
 }
 
 function closeM(){
-  document.getElementById('ov').style.display = 'none';
+  document.getElementById('ov').classList.remove('active');
   curId = null;
 }
 
+/* ============================================================
+   СОХРАНЕНИЕ
+   ============================================================ */
 async function saveM(){
   if (curId === null) return;
 
-  const updateUrl = `${BASE}/${curId}.json`;   // ✅ исправлено
+  const btn = document.getElementById('saveBtn');
   const updates = {
     status: document.getElementById('fst').value,
-    part:   document.getElementById('fp').value,
+    part:   document.getElementById('fp').value.trim(),
     count:  parseInt(document.getElementById('fc').value, 10) || 0,
-    load:   parseInt(document.getElementById('fl').value, 10) || 0
+    load:   Math.max(0, Math.min(100, parseInt(document.getElementById('fl').value, 10) || 0))
   };
 
+  if (!USE_FIREBASE) {
+    // Локальное сохранение (демо-режим)
+    localDemo[curId] = { ...localDemo[curId], ...updates };
+    closeM();
+    await loadData();
+    return;
+  }
+
+  btn.disabled = true;
   try {
-    const res = await fetch(updateUrl, { method: "PATCH", body: JSON.stringify(updates) });
+    const res = await fetch(`${BASE}/${curId}.json`, {
+      method: "PATCH",
+      body: JSON.stringify(updates)
+    });
     if (!res.ok) throw new Error("HTTP " + res.status);
     closeM();
     await loadData();
   } catch (e) {
     console.error("saveM error:", e);
-    alert("Не удалось сохранить. Проверьте подключение к Firebase.");
+    toast("Не удалось сохранить. Проверьте Firebase.");
+  } finally {
+    btn.disabled = false;
   }
 }
 
+/* ============================================================
+   СБРОС В ДЕМО-ДАННЫЕ
+   ============================================================ */
+async function resetToDemo(){
+  if (!confirm("Сбросить все данные в демо-значения?")) return;
+  localDemo = JSON.parse(JSON.stringify(initialData));
+
+  if (!USE_FIREBASE) {
+    await loadData();
+    return;
+  }
+  try {
+    const res = await fetch(ROOT_URL, { method: "PUT", body: JSON.stringify(initialData) });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    await loadData();
+  } catch (e) {
+    console.error("resetToDemo error:", e);
+    toast("Не удалось сбросить базу.");
+  }
+}
+
+/* ============================================================
+   СТАРТ
+   ============================================================ */
 loadData();
-setInterval(loadData, 3000);
+if (USE_FIREBASE) setInterval(loadData, 5000);
+
+// Закрытие модалки по Esc
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeM(); });
 </script>
+</body>
+</html>
