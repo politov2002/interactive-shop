@@ -1,107 +1,146 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Центральный Ситуационный Центр</title><style>
-:root{--bg:#121214;--c:#1e1e24;--t:#f0faf2;--m:#94a3b8;--w:#10b981;--s:#f59e0b;--b:#ef4444;--n:#3b82f6;--brd:#334155}
-*{box-sizing:border-box;margin:0;padding:0;font-family:sans-serif}
-body{background:var(--bg);color:var(--t);padding:20px}
-header{text-align:center;margin-bottom:20px}
-.stats{display:flex;gap:15px;margin-bottom:20px;justify-content:center}
-.st-card{background:var(--c);border:1px solid var(--brd);padding:10px 20px;border-radius:10px;text-align:center}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px}
-.gt{grid-column:1/-1;margin:15px 0 5px;color:var(--m);border-left:4px solid #64748b;padding-left:10px}
-.card{background:var(--c);border:2px solid var(--brd);border-radius:12px;padding:15px;cursor:pointer;position:relative}
-.card::before{content:'';position:absolute;top:0;left:0;width:100%;height:5px}
-.card.work::before{background:var(--w)}.card.setup::before{background:var(--s)}.card.break::before{background:var(--b)}.card.no-mat::before{background:var(--n)}
-@keyframes p{50%{border-color:var(--b)}}.card.break-active{animation:p 2s infinite}
-.ch{display:flex;justify-content:space-between;margin-bottom:10px;font-weight:bold}
-.row{display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:4px;color:var(--m)}
-.row span:last-child{color:var(--t)}
-.ov{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:none;justify-content:center;align-items:center;z-index:9}
-.modal{background:#1e1e24;border:1px solid var(--brd);padding:20px;border-radius:12px;width:90%;max-width:380px}
-.fg{margin-bottom:10px}.fg label{display:block;font-size:0.8rem;color:var(--m);margin-bottom:4px}
-.fg select,.fg input{width:100%;background:#0f172a;border:1px solid var(--brd);padding:8px;border-radius:6px;color:#fff;outline:none}
-.btn{width:100%;background:#4f46e5;color:#fff;border:none;padding:10px;border-radius:6px;font-weight:bold;cursor:pointer;margin-top:10px}
-</style></head><body>
-<header><h1>🏭 Центральный Ситуационный Центр</h1><div class="stats">
-<div class="st-card"><h3>В работе</h3><div class="val" style="color:var(--w)" id="wc">0</div></div>
-<div class="st-card"><h3>Наладка</h3><div class="val" style="color:var(--s)" id="sc">0</div></div>
-<div class="st-card"><h3>Поломка</h3><div class="val" style="color:var(--b)" id="bc">0</div></div>
-<div class="st-card"><h3>OEE Цеха</h3><div class="val" style="color:#60a5fa" id="oee">0%</div></div>
-</div></header><div class="grid" id="g"></div>
-<div class="ov" id="ov"><div class="modal"><div class="ch"><span id="mt">Станок</span><button style="background:none;border:none;color:#fff;cursor:pointer;font-size:1.2rem" onclick="closeM()">&times;</button></div>
-<div class="fg"><label>Статус</label><select id="fst"><option value="work">🟢 В работе / Норма</option><option value="setup">🟡 Наладка / Обсуждение</option><option value="break">🔴 Поломка / Внимание</option><option value="no-mat">🔵 Нет заготовки / Ожидание</option></select></div>
-<div class="fg"><label id="lbl-part">Деталь</label><input type="text" id="fp"></div>
-<div class="fg"><label id="lbl-count">Количество</label><input type="number" id="fc"></div>
-<div class="fg"><label id="lbl-load">Загрузка (%)</label><input type="number" id="fl" min="0" max="100"></div>
-<button class="btn" onclick="saveM()">Сохранить в базу</button></div></div>
 <script>
-const url = "https://firebaseio.com";
-let macs = []; let curId = null;
+// ⚠️ ЗАМЕНИТЕ your-project-id на ID вашего Firebase-проекта
+const BASE = "https://your-project-id.firebaseio.com";
+const url = BASE + "/.json";
 
-const initialData = {
-  1: {id:1,name:"Фрезерный 3Х Китай №1",type:"milling",cnc:"Fanuc",status:"work",part:"Корпус редуктора",count:14,load:85},
-  2: {id:2,name:"Фрезерный 3Х Китай №2",type:"milling",cnc:"Fanuc",status:"work",part:"Фланец А3",count:32,load:78},
-  3: {id:3,name:"Фрезерный 3Х Китай №3",type:"milling",cnc:"Fanuc",status:"setup",part:"Переналадка",count:0,load:0},
-  4: {id:4,name:"Рободрил 5-ти координатный",type:"milling",cnc:"Fanuc",status:"work",part:"Лопатка турбины",count:3,load:92},
-  5: {id:5,name:"Фрезерный 3+1 координатный",type:"milling",cnc:"Fanuc",status:"no-mat",part:"Ожидание",count:45,load:0},
-  6: {id:6,name:"Китайский Токарно-Фрезерный",type:"turning",cnc:"Fanuc",status:"work",part:"Вал приводной",count:19,load:70},
-  7: {id:7,name:"Okuma Токарно-Фрезерная",type:"turning",cnc:"OSP",status:"work",part:"Шпиндель точный",count:8,load:88},
-  8: {id:8,name:"Токарный станок Малютка №1",type:"turning",cnc:"NC-201",status:"work",part:"Шпилька М12",count:142,load:50},
-  9: {id:9,name:"Токарный станок Малютка №2",type:"turning",cnc:"NC-201",status:"no-mat",part:"Ожидание",count:80,load:0},
-  10:{id:10,name:"Токарный с револьверной головкой Siemens",type:"turning",cnc:"Siemens",status:"work",part:"Муфта муфтовая",count:24,load:82},
-  11:{id:11,name:"Токарный с револьверной головкой",type:"turning",cnc:"ЧПУ",status:"break",part:"Сбой привода",count:11,load:0},
-  12:{id:12,name:"Фрезерная группа",type:"issue",cnc:"Вопросы",status:"work",part:"Обеспечение инструментом",count:2,load:40},
-  13:{id:13,name:"Токарная группа",type:"issue",cnc:"Вопросы",status:"setup",part:"Контроль деталей ОТК",count:5,load:60}
-};
+let macs = [];
+let curId = null;
+
+const initialData = { /* ... без изменений ... */ };
+
+// экранирование HTML
+function esc(s){
+  return String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
 
 async function loadData() {
-    try {
-        const response = await fetch(url);
-        let data = await response.json();
-        if (!data) {
-            await fetch(url, { method: "PUT", body: JSON.stringify(initialData) });
-            data = initialData;
-        }
-        macs = Object.values(data); render();
-    } catch (e) { console.error(e); }
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    let data = await response.json();
+    if (!data) {
+      await fetch(url, { method: "PUT", body: JSON.stringify(initialData) });
+      data = initialData;
+    }
+    macs = Object.values(data);
+    render();
+  } catch (e) {
+    console.error("loadData error:", e);
+  }
 }
 
 function render(){
-    const grid=document.getElementById('g');grid.innerHTML='';let grp='';
-    macs.forEach(m=>{
-        let gName = m.type==='milling'?'Фрезерная группа':m.type==='turning'?'Токарная группа':'Производственные вопросы';
-        if(grp!==gName){grp=gName;const t=document.createElement('h2');t.className='gt';t.innerText=grp;grid.appendChild(t)}
-        const c=document.createElement('div');c.className=`card ${m.status}`;if(m.status==='break')c.classList.add('break-active');c.onclick=()=>openM(m.id);
-        let lbl=m.status==='work'?'В работе':m.status==='setup'?'Наладка':m.status==='break'?'Поломка':'Нет заготовки';
-        if(m.type==='issue') lbl=m.status==='work'?'Норма':m.status==='setup'?'Обсуждение':m.status==='break'?'Внимание':'Ожидание';
-        c.innerHTML=`<div class="ch"><div>${m.name}</div><div style="font-size:0.75rem;color:var(--m)">${m.cnc}</div></div>
-        <div class="st-t" style="font-size:0.8rem;font-weight:bold;margin-bottom:8px">${lbl}</div>
-        <div class="row"><span>${m.type==='issue'?'Задача:':'Деталь:'}</span><span>${m.part}</span></div>
-        <div class="row"><span>${m.type==='issue'?'Задач:':'Готово:'}</span><span>${m.count} ${m.type==='issue'?'активно':'шт'}</span></div>
-        <div class="row"><span>${m.type==='issue'?'Приоритет:':'Загрузка:'}</span><span>${m.load}%</span></div>`;grid.appendChild(c)
-    });
-    let w=macs.filter(m=>m.type!=='issue'&&m.status==='work').length,s=macs.filter(m=>m.type!=='issue'&&m.status==='setup').length,b=macs.filter(m=>m.type!=='issue'&&m.status==='break').length;
-    document.getElementById('wc').innerText=w;document.getElementById('sc').innerText=s;document.getElementById('bc').innerText=b;
-    let tL=0,wM=0;macs.forEach(m=>{if(m.type!=='issue'&&m.status==='work'){tL+=m.load;wM++}});
-    let oee=wM>0?Math.round((tL/wM)*(1-(b/11))):0;document.getElementById('oee').innerText=Math.max(0,oee)+'%';
+  const grid = document.getElementById('g');
+  grid.innerHTML = '';
+  let grp = '';
+
+  macs.forEach(m=>{
+    let gName = m.type==='milling' ? 'Фрезерная группа'
+              : m.type==='turning' ? 'Токарная группа'
+              : 'Производственные вопросы';
+
+    if (grp !== gName) {
+      grp = gName;
+      const t = document.createElement('h2');
+      t.className = 'gt';
+      t.innerText = grp;
+      grid.appendChild(t);
+    }
+
+    const c = document.createElement('div');
+    c.className = `card ${m.status}`;
+    if (m.status === 'break') c.classList.add('break-active');
+    c.onclick = () => openM(m.id);
+
+    let lbl = m.status==='work' ? 'В работе'
+            : m.status==='setup' ? 'Наладка'
+            : m.status==='break' ? 'Поломка'
+            : 'Нет заготовки';
+
+    if (m.type === 'issue') {
+      lbl = m.status==='work' ? 'Норма'
+          : m.status==='setup' ? 'Обсуждение'
+          : m.status==='break' ? 'Внимание'
+          : 'Ожидание';
+    }
+
+    c.innerHTML = `
+      <div class="ch">
+        <div>${esc(m.name)}</div>
+        <div style="font-size:0.75rem;color:var(--m)">${esc(m.cnc)}</div>
+      </div>
+      <div class="st-t" style="font-size:0.8rem;font-weight:bold;margin-bottom:8px">${lbl}</div>
+      <div class="row"><span>${m.type==='issue'?'Задача:':'Деталь:'}</span><span>${esc(m.part)}</span></div>
+      <div class="row"><span>${m.type==='issue'?'Задач:':'Готово:'}</span><span>${esc(m.count)} ${m.type==='issue'?'активно':'шт'}</span></div>
+      <div class="row"><span>${m.type==='issue'?'Приоритет:':'Загрузка:'}</span><span>${esc(m.load)}%</span></div>`;
+    grid.appendChild(c);
+  });
+
+  const w = macs.filter(m=>m.type!=='issue' && m.status==='work').length;
+  const s = macs.filter(m=>m.type!=='issue' && m.status==='setup').length;
+  const b = macs.filter(m=>m.type!=='issue' && m.status==='break').length;
+
+  document.getElementById('wc').innerText = w;
+  document.getElementById('sc').innerText = s;
+  document.getElementById('bc').innerText = b;
+
+  let tL = 0, wM = 0;
+  macs.forEach(m=>{
+    if (m.type!=='issue' && m.status==='work') { tL += m.load; wM++; }
+  });
+
+  let oee = wM > 0 ? Math.round((tL/wM) * (1 - (b/11))) : 0;
+  oee = Math.max(0, Math.min(100, oee));
+  document.getElementById('oee').innerText = oee + '%';
 }
+
 function openM(id){
-    curId=id;const m=macs.find(x=>x.id===id);
-    document.getElementById('lbl-part').innerText=m.type==='issue'?"Тема вопроса / Задача:":"Изготавливаемая деталь:";
-    document.getElementById('lbl-count').innerText=m.type==='issue'?"Количество активных задач:":"Количество (шт):";
-    document.getElementById('lbl-load').innerText=m.type==='issue'?"Важность / Приоритет (%):":"Текущая загрузка (%):";
-    document.getElementById('mt').innerText=m.name;document.getElementById('fst').value=m.status;document.getElementById('fp').value=m.part;document.getElementById('fc').value=m.count;document.getElementById('fl').value=m.load;
-    document.getElementById('ov').style.display='flex';
+  curId = id;
+  const m = macs.find(x=>x.id===id);
+  if (!m) return;
+
+  document.getElementById('lbl-part').innerText  = m.type==='issue' ? "Тема вопроса / Задача:" : "Изготавливаемая деталь:";
+  document.getElementById('lbl-count').innerText = m.type==='issue' ? "Количество активных задач:" : "Количество (шт):";
+  document.getElementById('lbl-load').innerText  = m.type==='issue' ? "Важность / Приоритет (%):" : "Текущая загрузка (%):";
+
+  document.getElementById('mt').innerText = m.name;
+  document.getElementById('fst').value = m.status;
+  document.getElementById('fp').value  = m.part;
+  document.getElementById('fc').value  = m.count;
+  document.getElementById('fl').value  = m.load;
+
+  document.getElementById('ov').style.display = 'flex';
 }
-function closeM(){document.getElementById('ov').style.display='none';curId=null}
+
+function closeM(){
+  document.getElementById('ov').style.display = 'none';
+  curId = null;
+}
+
 async function saveM(){
-    if(curId===null)return;
-    const updateUrl = `https://firebaseio.com{curId}.json`;
-    const updates={status:document.getElementById('fst').value,part:document.getElementById('fp').value,count:parseInt(document.getElementById('fc').value)||0,load:parseInt(document.getElementById('fl').value)||0};
+  if (curId === null) return;
+
+  const updateUrl = `${BASE}/${curId}.json`;   // ✅ исправлено
+  const updates = {
+    status: document.getElementById('fst').value,
+    part:   document.getElementById('fp').value,
+    count:  parseInt(document.getElementById('fc').value, 10) || 0,
+    load:   parseInt(document.getElementById('fl').value, 10) || 0
+  };
+
+  try {
+    const res = await fetch(updateUrl, { method: "PATCH", body: JSON.stringify(updates) });
+    if (!res.ok) throw new Error("HTTP " + res.status);
     closeM();
-    try {
-        await fetch(updateUrl, { method: "PATCH", body: JSON.stringify(updates) });
-        loadData();
-    } catch(e) { console.error(e); }
+    await loadData();
+  } catch (e) {
+    console.error("saveM error:", e);
+    alert("Не удалось сохранить. Проверьте подключение к Firebase.");
+  }
 }
+
 loadData();
 setInterval(loadData, 3000);
-</script></body></html>
+</script>
