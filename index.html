@@ -1,4 +1,4 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><title>ЦЕХ ЧПУ БАЗА</title><style>
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Центральный Ситуационный Центр</title><style>
 :root{--bg:#121214;--c:#1e1e24;--t:#f0faf2;--m:#94a3b8;--w:#10b981;--s:#f59e0b;--b:#ef4444;--n:#3b82f6;--brd:#334155}
 *{box-sizing:border-box;margin:0;padding:0;font-family:sans-serif}
 body{background:var(--bg);color:var(--t);padding:20px}
@@ -20,6 +20,8 @@ header{text-align:center;margin-bottom:20px}
 .fg select,.fg input{width:100%;background:#0f172a;border:1px solid var(--brd);padding:8px;border-radius:6px;color:#fff;outline:none}
 .btn{width:100%;background:#4f46e5;color:#fff;border:none;padding:10px;border-radius:6px;font-weight:bold;cursor:pointer;margin-top:10px}
 </style>
+<script src="https://gstatic.com"></script>
+<script src="https://gstatic.com"></script>
 </head><body>
 <header><h1>🏭 Центральный Ситуационный Центр</h1><div class="stats">
 <div class="st-card"><h3>В работе</h3><div class="val" style="color:var(--w)" id="wc">0</div></div>
@@ -28,15 +30,12 @@ header{text-align:center;margin-bottom:20px}
 <div class="st-card"><h3>OEE Цеха</h3><div class="val" style="color:#60a5fa" id="oee">0%</div></div>
 </div></header><div class="grid" id="g"></div>
 <div class="ov" id="ov"><div class="modal"><div class="ch"><span id="mt">Станок</span><button style="background:none;border:none;color:#fff;cursor:pointer;font-size:1.2rem" onclick="closeM()">&times;</button></div>
-<div class="fg"><label>Статус</label><select id="fst"><option value="work">🟢 В работе / Норма</option><option value="setup">🟡 Наладка / Обсуждение</option><option value="break">🔴 Поломка / Требует внимания</option><option value="no-mat">🔵 Нет заготовки / Ожидание</option></select></div>
-<div class="fg"><label id="lbl-part">Изготавливаемая деталь</label><input type="text" id="fp"></div>
-<div class="fg"><label id="lbl-count">Количество (шт)</label><input type="number" id="fc"></div>
-<div class="fg"><label id="lbl-load">Текущая загрузка (%)</label><input type="number" id="fl" min="0" max="100"></div>
+<div class="fg"><label>Статус</label><select id="fst"><option value="work">🟢 В работе / Норма</option><option value="setup">🟡 Наладка / Обсуждение</option><option value="break">🔴 Поломка / Внимание</option><option value="no-mat">🔵 Нет заготовки / Ожидание</option></select></div>
+<div class="fg"><label id="lbl-part">Деталь</label><input type="text" id="fp"></div>
+<div class="fg"><label id="lbl-count">Количество</label><input type="number" id="fc"></div>
+<div class="fg"><label id="lbl-load">Загрузка (%)</label><input type="number" id="fl" min="0" max="100"></div>
 <button class="btn" onclick="saveM()">Сохранить в базу</button></div></div>
-<script type="module">
-import { initializeApp } from "https://gstatic.com";
-import { getDatabase, ref, onValue, update, set } from "https://gstatic.com";
-
+<script>
 const firebaseConfig = {
   apiKey: "AIzaSyD7IyidqpsQNxOyIO-gXiC2Y0iTgfGuBEw",
   authDomain: "://firebaseapp.com",
@@ -46,10 +45,9 @@ const firebaseConfig = {
   messagingSenderId: "523106922724",
   appId: "1:523106922724:web:daa409b569cb12653b3cf1"
 };
-
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-window.macs = []; window.curId = null;
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+let macs = []; let curId = null;
 
 const initialData = {
   1: {id:1,name:"Фрезерный 3Х Китай №1",type:"milling",cnc:"Fanuc",status:"work",part:"Корпус редуктора",count:14,load:85},
@@ -67,15 +65,15 @@ const initialData = {
   13:{id:13,name:"Токарная группа",type:"issue",cnc:"Вопросы",status:"setup",part:"Контроль деталей ОТК",count:5,load:60}
 };
 
-onValue(ref(db, 'machines'), (snapshot) => {
+db.ref('machines').on('value', (snapshot) => {
     const data = snapshot.val();
-    if (!data) { set(ref(db, 'machines'), initialData); return; }
-    window.macs = Object.values(data); render();
+    if (!data) { db.ref('machines').set(initialData); return; }
+    macs = Object.values(data); render();
 });
 
 function render(){
     const grid=document.getElementById('g');grid.innerHTML='';let grp='';
-    window.macs.forEach(m=>{
+    macs.forEach(m=>{
         let gName = m.type==='milling'?'Фрезерная группа':m.type==='turning'?'Токарная группа':'Производственные вопросы';
         if(grp!==gName){grp=gName;const t=document.createElement('h2');t.className='gt';t.innerText=grp;grid.appendChild(t)}
         const c=document.createElement('div');c.className=`card ${m.status}`;if(m.status==='break')c.classList.add('break-active');c.onclick=()=>openM(m.id);
@@ -84,26 +82,26 @@ function render(){
         c.innerHTML=`<div class="ch"><div>${m.name}</div><div style="font-size:0.75rem;color:var(--m)">${m.cnc}</div></div>
         <div class="st-t" style="font-size:0.8rem;font-weight:bold;margin-bottom:8px">${lbl}</div>
         <div class="row"><span>${m.type==='issue'?'Задача:':'Деталь:'}</span><span>${m.part}</span></div>
-        <div class="row"><span>${m.type==='issue'?'Кол-во задач:':'Готово:'}</span><span>${m.count} ${m.type==='issue'?'активно':'шт'}</span></div>
+        <div class="row"><span>${m.type==='issue'?'Задач:':'Готово:'}</span><span>${m.count} ${m.type==='issue'?'активно':'шт'}</span></div>
         <div class="row"><span>${m.type==='issue'?'Приоритет:':'Загрузка:'}</span><span>${m.load}%</span></div>`;grid.appendChild(c)
     });
-    let w=window.macs.filter(m=>m.type!=='issue'&&m.status==='work').length,s=window.macs.filter(m=>m.type!=='issue'&&m.status==='setup').length,b=window.macs.filter(m=>m.type!=='issue'&&m.status==='break').length;
+    let w=macs.filter(m=>m.type!=='issue'&&m.status==='work').length,s=macs.filter(m=>m.type!=='issue'&&m.status==='setup').length,b=macs.filter(m=>m.type!=='issue'&&m.status==='break').length;
     document.getElementById('wc').innerText=w;document.getElementById('sc').innerText=s;document.getElementById('bc').innerText=b;
-    let tL=0,wM=0;window.macs.forEach(m=>{if(m.type!=='issue'&&m.status==='work'){tL+=m.load;wM++}});
+    let tL=0,wM=0;macs.forEach(m=>{if(m.type!=='issue'&&m.status==='work'){tL+=m.load;wM++}});
     let oee=wM>0?Math.round((tL/wM)*(1-(b/11))):0;document.getElementById('oee').innerText=Math.max(0,oee)+'%';
 }
-window.openM = function(id){
-    window.curId=id;const m=window.macs.find(x=>x.id===id);
+function openM(id){
+    curId=id;const m=macs.find(x=>x.id===id);
     document.getElementById('lbl-part').innerText=m.type==='issue'?"Тема вопроса / Задача:":"Изготавливаемая деталь:";
     document.getElementById('lbl-count').innerText=m.type==='issue'?"Количество активных задач:":"Количество (шт):";
     document.getElementById('lbl-load').innerText=m.type==='issue'?"Важность / Приоритет (%):":"Текущая загрузка (%):";
     document.getElementById('mt').innerText=m.name;document.getElementById('fst').value=m.status;document.getElementById('fp').value=m.part;document.getElementById('fc').value=m.count;document.getElementById('fl').value=m.load;
     document.getElementById('ov').style.display='flex';
 }
-window.closeM = function(){document.getElementById('ov').style.display='none';window.curId=null}
-window.saveM = function(){
-    if(window.curId===null)return;
+function closeM(){document.getElementById('ov').style.display='none';curId=null}
+function saveM(){
+    if(curId===null)return;
     const updates={status:document.getElementById('fst').value,part:document.getElementById('fp').value,count:parseInt(document.getElementById('fc').value)||0,load:parseInt(document.getElementById('fl').value)||0};
-    update(ref(db,'machines/'+window.curId),updates);window.closeM();
+    db.ref('machines/'+curId).update(updates);closeM();
 }
 </script></body></html>
