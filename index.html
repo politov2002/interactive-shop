@@ -86,10 +86,16 @@ function render(){
         <div class="row"><span>${m.type==='issue'?'Кол-во задач:':'Готово:'}</span><span>${m.count} ${m.type==='issue'?'активно':'шт'}</span></div>
         <div class="row"><span>${m.type==='issue'?'Приоритет:':'Загрузка:'}</span><span>${m.load}%</span></div>`;grid.appendChild(c)
     });
-    let w=macs.filter(m=>m.type!=='issue'&&m.status==='work').length,s=macs.filter(m=>m.type!=='issue'&&m.status==='setup').length,b=macs.filter(m=>m.type!=='issue'&&m.status==='break').length;
-    document.getElementById('wc').innerText=w;document.getElementById('sc').innerText=s;document.getElementById('bc').innerText=b;
-    let tL=0,wM=0;macs.forEach(m=>{if(m.status==='work'&&m.type!=='issue'){tL+=m.load;wM++}});
-    let oee=wM>0?Math.round((tL/wM)*(1-(b/11))):0;document.getElementById('oee').innerText=Math.max(0,oee)+'%';
+        let w=macs.filter(m=>m.type!=='issue'&&m.status==='work').length;
+    let s=macs.filter(m=>m.type!=='issue'&&m.status==='setup').length;
+    let b=macs.filter(m=>m.type!=='issue'&&m.status==='break').length;
+    if(document.getElementById('wc')) document.getElementById('wc').innerText=w;
+    if(document.getElementById('sc')) document.getElementById('sc').innerText=s;
+    if(document.getElementById('bc')) document.getElementById('bc').innerText=b;
+    let tL=0,wM=0; macs.forEach(m=>{if(m.type!=='issue'&&m.status==='work'){tL+=m.load;wM++}});
+    let oee=wM>0?Math.round((tL/wM)*(1-(b/11))):0;
+    if(document.getElementById('oee')) document.getElementById('oee').innerText=Math.max(0,oee)+'%';
+
 }
 function openM(id){
     curId=id;const m=macs.find(x=>x.id===id);
