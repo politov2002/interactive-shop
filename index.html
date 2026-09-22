@@ -525,4 +525,188 @@ async function saveM(){
       body: JSON.stringify(updates)
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
-   
+    closeM();
+    await loadData();
+    toast("Сохранено", true);
+  } catch (e) {
+    console.error("saveM error:", e);
+    toast("Не удалось сохранить. Проверьте Firebase Rules.");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ============================================================
+   КАЛЕНДАРЬ
+   ============================================================ */
+const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь',
+                'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+function openJournal(){
+  const today = new Date();
+  calYear  = today.getFullYear();
+  calMonth = today.getMonth();
+  selectedDay = null;
+  document.getElementById('dayForm').classList.add('hidden');
+  showJournalScreen();
+  renderCalendar();
+}
+
+function closeJournal(){
+  showEditScreen();
+}
+
+function calPrevMonth(){
+  calMonth--;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+function calNextMonth(){
+  calMonth++;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCalendar();
+}
+
+function renderCalendar(){
+  document.getElementById('calMonthLabel').textContent = `${MONTHS[calMonth]} ${calYear}`;
+
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+
+  const first = new Date(calYear, calMonth, 1);
+  // Пн=0 ... Вс=6
+  let startOffset = first.getDay() - 1;
+  if (startOffset < 0) startOffset = 6;
+
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const today = new Date();
+  const todayKey = dateKey(today.getFullYear(), today.getMonth(), today.getDate());
+
+  // Пустые ячейки до первого дня
+  for (let i = 0; i < startOffset; i++) {
+    const e = document.createElement('div');
+    e.className = 'cal-day empty';
+    grid.appendChild(e);
+  }
+
+  const macJournal = journal[curId] || {};
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = dateKey(calYear, calMonth, d);
+    const cell = document.createElement('div');
+    cell.className = 'cal-day';
+    if (key === todayKey) cell.classList.add('today');
+    cell.textContent = d;
+
+    const rec = macJournal[key];
+    if (rec && rec.status) {
+      const dot = document.createElement('span');
+      dot.className = 'dot ' + rec.status;
+      cell.appendChild(dot);
+    }
+
+    cell.onclick = () => selectDay(key);
+    grid.appendChild(cell);
+  }
+}
+
+function selectDay(key){
+  selectedDay = key;
+
+  const rec = (journal[curId] || {})[key] || { status:'work', count:0, note:'' };
+
+  // Форматируем дату в «22 сентября 2026»
+  const [y,m,d] = key.split('-').map(Number);
+  const monthName = MONTHS[m-1];
+  document.getElementById('dayFormTitle').textContent = `Запись на ${d} ${monthName.toLowerCase()} ${y}`;
+
+  document.getElementById('dStatus').value = rec.status || 'work';
+  document.getElementById('dCount').value  = rec.count || 0;
+  document.getElementById('dNote').value   = rec.note || '';
+
+  document.getElementById('dayForm').classList.remove('hidden');
+}
+
+async function saveDay(){
+  if (!selectedDay || curId === null) return;
+
+  const rec = {
+    status: document.getElementById('dStatus').value,
+    count:  parseInt(document.getElementById('dCount').value, 10) || 0,
+    note:   document.getElementById('dNote').value.trim(),
+    updated: new Date().toISOString()
+  };
+
+  try {
+    const res = await fetch(`${BASE}/journal/${curId}/${selectedDay}.json`, {
+      method: "PUT",
+      body: JSON.stringify(rec)
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+
+    if (!journal[curId]) journal[curId] = {};
+    journal[curId][selectedDay] = rec;
+
+    renderCalendar();
+    toast("Запись сохранена", true);
+  } catch (e) {
+    console.error("saveDay error:", e);
+    toast("Не удалось сохранить запись.");
+  }
+}
+
+async function deleteDay(){
+  if (!selectedDay || curId === null) return;
+  if (!confirm("Удалить запись за этот день?")) return;
+
+  try {
+    const res = await fetch(`${BASE}/journal/${curId}/${selectedDay}.json`, {
+      method: "DELETE"
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+
+    if (journal[curId]) delete journal[curId][selectedDay];
+    document.getElementById('dayForm').classList.add('hidden');
+    selectedDay = null;
+    renderCalendar();
+    toast("Запись удалена", true);
+  } catch (e) {
+    console.error("deleteDay error:", e);
+    toast("Не удалось удалить запись.");
+  }
+}
+
+/* ============================================================
+   СБРОС В ДЕМО-ДАННЫЕ
+   ============================================================ */
+async function resetToDemo(){
+  if (!confirm("Сбросить ВСЕ данные (карточки и журнал) в демо-значения?")) return;
+  try {
+    // Сбрасываем только карточки — журнал удалять не обязательно.
+    // Но чтобы получить чистое состояние — удаляем и его тоже.
+    await fetch(ROOT_URL, { method: "PUT", body: JSON.stringify(initialData) });
+    await fetch(JOURNAL_URL, { method: "DELETE" });
+
+    journal = {};
+    await loadData();
+    toast("База сброшена в демо-данные", true);
+  } catch (e) {
+    console.error("resetToDemo error:", e);
+    toast("Не удалось сбросить базу.");
+  }
+}
+
+/* ============================================================
+   СТАРТ
+   ============================================================ */
+loadData();
+setInterval(() => {
+  // Авто-обновление раз в 5 сек, но не мешаем, если открыт календарь
+  if (!document.getElementById('journalScreen').classList.contains('hidden')) return;
+  loadData();
+}, 5000);
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeM(); });
+</script>
+</body>
+</html>
