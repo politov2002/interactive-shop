@@ -2,694 +2,447 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0f1720">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Карта станков</title>
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
+<link rel="icon" type="image/svg+xml" href="./icon.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Центральный Ситуационный Центр</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  html, body {
-    height: 100%; overflow: hidden;
-    font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
-    background: #0f1720; color: #e6edf3;
-    user-select: none; touch-action: none;
+  :root{
+    --bg:#121214; --c:#1e1e24; --t:#f0faf2; --m:#94a3b8;
+    --w:#10b981; --s:#f59e0b; --b:#ef4444; --n:#3b82f6; --brd:#334155;
   }
-
-  header {
-    background: #1a2430;
-    padding: 10px 20px;
-    display: flex; align-items: center; gap: 20px;
-    border-bottom: 1px solid #2a3746;
-    flex-wrap: wrap;
-    padding-top: max(10px, env(safe-area-inset-top));
-  }
-  h1 { font-size: 16px; font-weight: 600; white-space: nowrap; }
-  .kpi { display: flex; gap: 16px; margin-left: auto; flex-wrap: wrap; }
-  .kpi-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #9fb0c3; }
-  .kpi-dot { width: 10px; height: 10px; border-radius: 50%; }
-  .kpi-val { color: #fff; font-weight: 700; font-size: 15px; }
-
-  main { display: flex; height: calc(100% - 56px); }
-
-  .map {
-    flex: 1; position: relative; overflow: hidden;
-    background:
-      linear-gradient(#1b2735 1px, transparent 1px) 0 0/40px 40px,
-      linear-gradient(90deg, #1b2735 1px, transparent 1px) 0 0/40px 40px,
-      #101923;
-    touch-action: none;
-  }
-  .map-inner {
-    position: absolute; inset: 0;
-    transform-origin: 0 0;
-    will-change: transform;
-  }
-  .machine {
-    position: absolute;
-    width: 130px; height: 90px;
-    border-radius: 12px;
-    background: #1e2c3a;
-    border: 2px solid #2f4256;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    cursor: pointer;
-    transition: box-shadow .2s, border-color .2s;
-    font-size: 12px;
-  }
-  .machine .id { font-weight: 700; font-size: 20px; }
-  .machine .op { font-size: 12px; color: #9fb0c3; margin-top: 4px; }
-  .machine .pulse {
-    position: absolute; top: 8px; right: 8px;
-    width: 12px; height: 12px; border-radius: 50%;
-  }
-  .machine.running { border-color: #2ecc71; box-shadow: 0 0 16px rgba(46,204,113,.35); }
-  .machine.running .pulse { background: #2ecc71; animation: pulse 1.5s infinite; }
-  .machine.idle    { border-color: #f1c40f; }
-  .machine.idle .pulse { background: #f1c40f; }
-  .machine.repair  { border-color: #3498db; opacity: .8; }
-  .machine.repair .pulse { background: #3498db; }
-  .machine.alarm   { border-color: #e74c3c; box-shadow: 0 0 20px rgba(231,76,60,.6); }
-  .machine.alarm .pulse { background: #e74c3c; animation: pulse .7s infinite; }
-  .machine.selected { outline: 3px solid #58a6ff; outline-offset: 3px; }
-
-  @keyframes pulse {
-    0%,100% { opacity: 1; transform: scale(1); }
-    50% { opacity: .4; transform: scale(1.5); }
-  }
-
-  aside {
-    width: 360px;
-    background: #1a2430;
-    border-left: 1px solid #2a3746;
-    padding: 20px;
-    overflow-y: auto;
-    transition: transform .3s;
-    display: flex; flex-direction: column;
-  }
-  aside.hidden { transform: translateX(100%); width: 0; padding: 0; overflow: hidden; }
-  aside h2 { font-size: 20px; margin-bottom: 8px; }
-  .close-btn {
-    float: right; background: none; border: none; color: #9fb0c3;
-    font-size: 24px; cursor: pointer; padding: 0 8px;
-  }
-  .detail-row {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 12px 0; border-bottom: 1px solid #24323f; font-size: 14px;
-  }
-  .detail-row span:first-child { color: #9fb0c3; }
-  .status-badge {
-    padding: 4px 12px; border-radius: 14px;
-    font-size: 12px; font-weight: 700; text-transform: uppercase;
-  }
-  .badge-running { background: rgba(46,204,113,.15); color: #2ecc71; }
-  .badge-idle    { background: rgba(241,196,15,.15); color: #f1c40f; }
-  .badge-repair  { background: rgba(52,152,219,.15); color: #3498db; }
-  .badge-alarm   { background: rgba(231,76,60,.15); color: #e74c3c; }
-  .placeholder { color: #6b7d92; font-size: 14px; text-align: center; margin-top: 40px; }
-  .progress { height: 8px; background: #24323f; border-radius: 4px; overflow: hidden; margin-top: 6px; }
-  .progress > div { height: 100%; background: #58a6ff; transition: width .4s; }
-
-  /* ===== ПЛАШКИ-ВКЛАДКИ (быстрые заметки) ===== */
-  .notes-tabs {
-    position: fixed;
-    right: 20px;
-    bottom: max(20px, env(safe-area-inset-bottom));
-    display: flex;
-    gap: 10px;
-    z-index: 500;
-  }
-  .note-tab {
-    display: flex; align-items: center; gap: 8px;
-    padding: 12px 18px;
-    border-radius: 30px;
-    font-size: 14px; font-weight: 600;
-    cursor: pointer;
-    border: 2px solid transparent;
-    transition: all .2s;
-    box-shadow: 0 6px 20px rgba(0,0,0,.4);
-    user-select: none;
-  }
-  .note-tab.op  { background: #2a2f1e; color: #f1c40f; border-color: rgba(241,196,15,.5); }
-  .note-tab.pr  { background: #1e2a3a; color: #58a6ff; border-color: rgba(88,166,255,.5); }
-  .note-tab .count {
-    background: rgba(255,255,255,.15);
-    border-radius: 10px;
-    padding: 1px 8px;
-    font-size: 12px;
-    font-weight: 700;
-  }
-  .note-tab.active { transform: translateY(-3px); }
-
-  /* ===== МОДАЛКА-БЛОКНОТ ===== */
-  .notebook-modal {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,.6);
-    backdrop-filter: blur(4px);
-    display: none;
-    align-items: flex-end;
-    justify-content: flex-end;
-    z-index: 900;
-    padding: 20px;
-  }
-  .notebook-modal.open { display: flex; }
-  .notebook {
-    background: #1a2430;
-    border-radius: 16px;
-    width: 100%;
-    max-width: 520px;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
-    border: 1px solid #2a3746;
-    box-shadow: 0 20px 60px rgba(0,0,0,.6);
-    overflow: hidden;
-  }
-  .notebook-header {
-    padding: 16px 20px;
-    display: flex; align-items: center; gap: 12px;
-    border-bottom: 1px solid #24323f;
-  }
-  .notebook-header h3 { font-size: 18px; flex: 1; }
-  .notebook-header .accent { width: 6px; height: 24px; border-radius: 3px; }
-  .notebook-close {
-    background: none; border: none; color: #9fb0c3;
-    font-size: 24px; cursor: pointer; padding: 0 8px;
-    line-height: 1;
-  }
-
-  .notebook-input {
-    padding: 16px 20px;
-    border-bottom: 1px solid #24323f;
-    display: flex; flex-direction: column; gap: 10px;
-  }
-  .notebook-input textarea {
-    width: 100%;
-    min-height: 90px;
-    background: #0f1720;
-    border: 1px solid #2a3746;
-    border-radius: 10px;
-    padding: 12px;
-    color: #e6edf3;
-    font-family: inherit;
-    font-size: 14px;
-    resize: vertical;
-    outline: none;
-    transition: border .2s;
-  }
-  .notebook-input textarea:focus { border-color: #58a6ff; }
-  .notebook-input .row {
-    display: flex; justify-content: space-between; align-items: center; gap: 10px;
-  }
-  .notebook-input .hint { font-size: 12px; color: #6b7d92; }
-  .btn-add {
-    background: #58a6ff; color: #0f1720;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-size: 14px; font-weight: 700;
-    cursor: pointer;
-    transition: background .2s;
-  }
-  .btn-add:hover { background: #7ab8ff; }
-  .btn-add:active { transform: scale(.97); }
-
-  .notes-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px 20px 20px;
-    display: flex; flex-direction: column; gap: 10px;
-  }
-  .note-item {
-    background: #0f1720;
-    border: 1px solid #24323f;
-    border-radius: 10px;
-    padding: 12px 14px;
-    position: relative;
-    font-size: 14px;
-    line-height: 1.5;
-    word-break: break-word;
-    animation: slideIn .25s ease;
-  }
-  @keyframes slideIn {
-    from { opacity: 0; transform: translateY(-6px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .note-item .text { color: #e6edf3; white-space: pre-wrap; }
-  .note-item .meta {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-top: 8px;
-    font-size: 11px; color: #6b7d92;
-  }
-  .note-item .del {
-    background: none; border: none;
-    color: #e74c3c;
-    font-size: 16px;
-    cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 6px;
-    transition: background .2s;
-  }
-  .note-item .del:hover { background: rgba(231,76,60,.15); }
-
-  .empty-notes {
-    text-align: center;
-    color: #6b7d92;
-    padding: 30px 20px;
-    font-size: 13px;
-  }
-
-  /* Кнопка установки PWA */
-  #installBtn {
-    display: none;
-    position: fixed; bottom: 20px; left: 20px;
-    background: #58a6ff; color: #0f1720;
-    border: none; padding: 14px 22px;
-    border-radius: 30px; font-size: 15px; font-weight: 700;
-    cursor: pointer; z-index: 1000;
-    box-shadow: 0 6px 20px rgba(88,166,255,.4);
-    padding-bottom: max(14px, env(safe-area-inset-bottom));
-  }
-  #installBtn.show { display: block; }
-
-  @media (max-width: 900px) {
-    aside { position: fixed; top: 56px; right: 0; bottom: 0; width: 85%; z-index: 100; }
-    h1 { font-size: 14px; }
-    .kpi { gap: 10px; }
-    .kpi-item { font-size: 11px; }
-    .kpi-val { font-size: 13px; }
-    .notes-tabs { flex-direction: column; }
-    .notebook { max-height: 90vh; }
-  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  body{background:var(--bg);color:var(--t);padding:20px;min-height:100vh}
+  header{text-align:center;margin-bottom:20px}
+  header h1{font-size:clamp(1.1rem,2.5vw,1.8rem)}
+  .stats{display:flex;gap:15px;margin-top:15px;justify-content:center;flex-wrap:wrap}
+  .st-card{background:var(--c);border:1px solid var(--brd);padding:10px 20px;border-radius:10px;text-align:center;min-width:110px}
+  .st-card h3{font-size:.75rem;color:var(--m);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+  .val{font-size:1.5rem;font-weight:700}
+  .toolbar{display:flex;justify-content:center;gap:10px;margin-bottom:15px;flex-wrap:wrap}
+  .toolbar button{background:#1e293b;color:#cbd5e1;border:1px solid var(--brd);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.8rem}
+  .toolbar button:hover{background:#334155}
+  .badge{display:inline-block;font-size:.7rem;padding:2px 8px;border-radius:10px;background:#0f172a;border:1px solid var(--brd);color:var(--m);margin-left:6px;vertical-align:middle}
+  .badge.live{color:var(--w);border-color:var(--w)}
+  .badge.offline{color:var(--b);border-color:var(--b)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px}
+  .gt{grid-column:1/-1;margin:15px 0 5px;color:var(--m);border-left:4px solid #64748b;padding-left:10px;font-size:1rem}
+  .card{background:var(--c);border:2px solid var(--brd);border-radius:12px;padding:15px;cursor:pointer;position:relative;transition:transform .12s,border-color .12s}
+  .card:hover{transform:translateY(-2px);border-color:#475569}
+  .card::before{content:'';position:absolute;top:0;left:0;width:100%;height:5px;border-radius:12px 12px 0 0}
+  .card.work::before{background:var(--w)}
+  .card.setup::before{background:var(--s)}
+  .card.break::before{background:var(--b)}
+  .card.no-mat::before{background:var(--n)}
+  .card.issue-ok::before{background:var(--w)}
+  .card.issue-alert::before{background:var(--b)}
+  @keyframes pulse{50%{border-color:var(--b)}}
+  .card.break-active{animation:pulse 2s infinite}
+  .card.issue-alert{animation:pulse 2s infinite}
+  .ch{display:flex;justify-content:space-between;gap:10px;margin-bottom:10px;font-weight:bold;font-size:.95rem}
+  .ch > div:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .row{display:flex;justify-content:space-between;gap:10px;font-size:.85rem;margin-bottom:4px;color:var(--m)}
+  .row span:last-child{color:var(--t);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
+  /* Блок причины простоя */
+  .reason{margin-top:10px;font-size:.82rem;padding:8px 10px;border-radius:6px;border-left:3px solid;background:rgba(0,0,0,.25);word-break:break-word}
+  .reason.break{color:#fca5a5;border-color:var(--b);background:rgba(239,68,68,.1)}
+  .reason.setup{color:#fcd34d;border-color:var(--s);background:rgba(245,158,11,.1)}
+  .reason.no-mat{color:#93c5fd;border-color:var(--n);background:rgba(59,130,246,.1)}
+  .reason-label{display:block;font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;opacity:.7;margin-bottom:2px}
+  .note-preview{margin-top:8px;font-size:.82rem;color:#cbd5e1;background:#0f172a;border:1px solid var(--brd);border-radius:6px;padding:8px;white-space:pre-wrap;word-break:break-word;max-height:110px;overflow:hidden;position:relative}
+  .note-preview::after{content:'';position:absolute;bottom:0;left:0;right:0;height:24px;background:linear-gradient(transparent,#0f172a)}
+  .ov{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;justify-content:center;align-items:center;z-index:9;padding:15px}
+  .ov.active{display:flex}
+  .modal{background:#1e1e24;border:1px solid var(--brd);padding:20px;border-radius:12px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto}
+  .modal .ch{margin-bottom:15px}
+  .fg{margin-bottom:10px}
+  .fg label{display:block;font-size:.8rem;color:var(--m);margin-bottom:4px}
+  .fg select,.fg input,.fg textarea{width:100%;background:#0f172a;border:1px solid var(--brd);padding:8px;border-radius:6px;color:#fff;outline:none;font-size:.9rem;font-family:inherit}
+  .fg textarea{min-height:80px;resize:vertical}
+  .fg select:focus,.fg input:focus,.fg textarea:focus{border-color:#6366f1}
+  .btn{width:100%;background:#4f46e5;color:#fff;border:none;padding:10px;border-radius:6px;font-weight:bold;cursor:pointer;margin-top:10px;font-size:.95rem}
+  .btn:hover{background:#4338ca}
+  .btn:disabled{opacity:.6;cursor:wait}
+  .status-toggle{display:flex;gap:10px}
+  .status-toggle label{flex:1;cursor:pointer;display:block}
+  .status-toggle input{display:none}
+  .status-toggle .opt{padding:10px;text-align:center;border:2px solid var(--brd);border-radius:8px;font-weight:600;font-size:.9rem;transition:all .15s}
+  .status-toggle input:checked + .opt.ok{border-color:var(--w);background:rgba(16,185,129,.12);color:var(--w)}
+  .status-toggle input:checked + .opt.alert{border-color:var(--b);background:rgba(239,68,68,.12);color:var(--b)}
+  .status-toggle .opt:hover{border-color:#64748b}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#ef4444;color:#fff;padding:10px 18px;border-radius:8px;font-size:.85rem;z-index:20;opacity:0;transition:opacity .3s;pointer-events:none}
+  .toast.show{opacity:1}
 </style>
 </head>
 <body>
 
 <header>
-  <h1>🏭 Цех №1</h1>
-  <div class="kpi">
-    <div class="kpi-item"><span class="kpi-dot" style="background:#2ecc71"></span>Работают: <span class="kpi-val" id="kpiRun">0</span></div>
-    <div class="kpi-item"><span class="kpi-dot" style="background:#f1c40f"></span>Простой: <span class="kpi-val" id="kpiIdle">0</span></div>
-    <div class="kpi-item"><span class="kpi-dot" style="background:#3498db"></span>Ремонт: <span class="kpi-val" id="kpiRep">0</span></div>
-    <div class="kpi-item"><span class="kpi-dot" style="background:#e74c3c"></span>Авария: <span class="kpi-val" id="kpiAlarm">0</span></div>
+  <h1>🏭 Центральный Ситуационный Центр <span id="connBadge" class="badge">…</span></h1>
+  <div class="stats">
+    <div class="st-card"><h3>В работе</h3><div class="val" style="color:var(--w)" id="wc">0</div></div>
+    <div class="st-card"><h3>Наладка</h3><div class="val" style="color:var(--s)" id="sc">0</div></div>
+    <div class="st-card"><h3>Поломка</h3><div class="val" style="color:var(--b)" id="bc">0</div></div>
+    <div class="st-card"><h3>OEE Цеха</h3><div class="val" style="color:#60a5fa" id="oee">0%</div></div>
   </div>
 </header>
 
-<main>
-  <div class="map" id="map">
-    <div class="map-inner" id="mapInner"></div>
-  </div>
-  <aside id="panel" class="hidden">
-    <button class="close-btn" id="closeBtn">✕</button>
-    <h2>Детали станка</h2>
-    <p class="placeholder">Выберите станок</p>
-  </aside>
-</main>
-
-<!-- ===== ПЛАШКИ-ВКЛАДКИ ===== -->
-<div class="notes-tabs">
-  <div class="note-tab op" id="tabOp">
-    ⚡ Оперативные вопросы
-    <span class="count" id="countOp">0</span>
-  </div>
-  <div class="note-tab pr" id="tabPr">
-    🏭 Производственные вопросы
-    <span class="count" id="countPr">0</span>
-  </div>
+<div class="toolbar">
+  <button onclick="resetToDemo()">↺ Сбросить в демо-данные</button>
 </div>
 
-<!-- ===== МОДАЛКА-БЛОКНОТ ===== -->
-<div class="notebook-modal" id="notebookModal">
-  <div class="notebook">
-    <div class="notebook-header">
-      <div class="accent" id="notebookAccent"></div>
-      <h3 id="notebookTitle">Блокнот</h3>
-      <button class="notebook-close" id="notebookClose">✕</button>
+<div class="grid" id="g"></div>
+
+<div class="ov" id="ov" onclick="if(event.target===this)closeM()">
+  <div class="modal">
+    <div class="ch">
+      <span id="mt">Станок</span>
+      <button style="background:none;border:none;color:#fff;cursor:pointer;font-size:1.2rem" onclick="closeM()" aria-label="Закрыть">&times;</button>
     </div>
 
-    <div class="notebook-input">
-      <textarea id="noteInput" placeholder="Введите текст заметки..."></textarea>
-      <div class="row">
-        <span class="hint">💾 Сохраняется автоматически</span>
-        <button class="btn-add" id="btnAddNote">➕ Добавить</button>
+    <div id="machineFields">
+      <div class="fg">
+        <label>Статус</label>
+        <select id="fst">
+          <option value="work">🟢 В работе / Норма</option>
+          <option value="setup">🟡 Наладка / Обсуждение</option>
+          <option value="break">🔴 Поломка / Внимание</option>
+          <option value="no-mat">🔵 Нет заготовки / Ожидание</option>
+        </select>
+      </div>
+      <div class="fg"><label>Изготавливаемая деталь:</label><input type="text" id="fp"></div>
+      <div class="fg"><label>Количество (шт):</label><input type="number" id="fc" min="0"></div>
+      <div class="fg"><label>Текущая загрузка (%):</label><input type="number" id="fl" min="0" max="100"></div>
+      <div class="fg">
+        <label>Причина простоя (если станок не в работе)</label>
+        <textarea id="fr" placeholder="Например: ожидание материала, сбой привода, переналадка под новую деталь..."></textarea>
       </div>
     </div>
 
-    <div class="notes-list" id="notesList"></div>
+    <div id="issueFields" style="display:none">
+      <div class="fg">
+        <label>Индикация</label>
+        <div class="status-toggle">
+          <label>
+            <input type="radio" name="issueStatus" value="ok">
+            <div class="opt ok">🟢 Норма / Решено</div>
+          </label>
+          <label>
+            <input type="radio" name="issueStatus" value="alert">
+            <div class="opt alert">🔴 Внимание / Проблема</div>
+          </label>
+        </div>
+      </div>
+      <div class="fg">
+        <label>Блокнот (заметки, задачи, комментарии)</label>
+        <textarea id="fnote" placeholder="Введите текст..."></textarea>
+      </div>
+    </div>
+
+    <button class="btn" id="saveBtn" onclick="saveM()">Сохранить в базу</button>
   </div>
 </div>
 
-<button id="installBtn">📲 Установить приложение</button>
+<div class="toast" id="toast"></div>
 
 <script>
-/* =======================================================
-   1. КАРТА СТАНКОВ
-======================================================= */
-const machines = [
-  { id: 'CNC-01',  x: 40,  y: 40,  status: 'running', operator: 'Иванов А.',  load: 87, output: 1240 },
-  { id: 'CNC-02',  x: 220, y: 40,  status: 'running', operator: 'Петров С.',  load: 92, output: 1380 },
-  { id: 'CNC-03',  x: 400, y: 40,  status: 'idle',    operator: '—',          load: 0,  output: 980  },
-  { id: 'CNC-04',  x: 40,  y: 180, status: 'running', operator: 'Сидоров В.', load: 78, output: 1120 },
-  { id: 'LATHE-1', x: 220, y: 180, status: 'alarm',   operator: 'Кузнецов Д.',load: 45, output: 640  },
-  { id: 'LATHE-2', x: 400, y: 180, status: 'running', operator: 'Морозов И.', load: 95, output: 1450 },
-  { id: 'MILL-01', x: 40,  y: 320, status: 'repair',  operator: '—',          load: 0,  output: 720  },
-  { id: 'MILL-02', x: 220, y: 320, status: 'running', operator: 'Волков П.',  load: 81, output: 1010 },
-  { id: 'PRESS-1', x: 400, y: 320, status: 'idle',    operator: '—',          load: 0,  output: 540  },
-  { id: 'PRESS-2', x: 580, y: 180, status: 'running', operator: 'Зайцев Н.',  load: 88, output: 1290 },
-];
+/* ============================================================
+   FIREBASE
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyD7IyidqpsQNxOyIO-gXiC2Y0iTgfGuBEw",
+  authDomain: "nahabino-d8803.firebaseapp.com",
+  databaseURL: "https://nahabino-d8803-default-rtdb.firebaseio.com",
+  projectId: "nahabino-d8803",
+  storageBucket: "nahabino-d8803.firebasestorage.app",
+  messagingSenderId: "523106922724",
+  appId: "1:523106922724:web:daa409b569cb12653b3cf1"
+};
+const BASE = firebaseConfig.databaseURL;
+const ROOT_URL = BASE + "/.json";
 
-const statusLabels = {
-  running: 'Работает', idle: 'Простой', repair: 'Ремонт', alarm: 'Авария'
+/* ============================================================
+   ДЕМО-ДАННЫЕ (с новым полем reason)
+   ============================================================ */
+const initialData = {
+  1:  {id:1,  name:"Фрезерный 3Х Китай №1",              type:"milling", cnc:"Fanuc",   status:"work",   part:"Корпус редуктора",       count:14,  load:85, reason:""},
+  2:  {id:2,  name:"Фрезерный 3Х Китай №2",              type:"milling", cnc:"Fanuc",   status:"work",   part:"Фланец А3",              count:32,  load:78, reason:""},
+  3:  {id:3,  name:"Фрезерный 3Х Китай №3",              type:"milling", cnc:"Fanuc",   status:"setup",  part:"Переналадка",            count:0,   load:0,  reason:"Переналадка на новую деталь «Крышка подшипника»"},
+  4:  {id:4,  name:"Рободрил 5-ти координатный",         type:"milling", cnc:"Fanuc",   status:"work",   part:"Лопатка турбины",        count:3,   load:92, reason:""},
+  5:  {id:5,  name:"Фрезерный 3+1 координатный",         type:"milling", cnc:"Fanuc",   status:"no-mat", part:"Ожидание",               count:45,  load:0,  reason:"Нет заготовок — ждём поставку со склада"},
+  6:  {id:6,  name:"Китайский Токарно-Фрезерный",        type:"turning", cnc:"Fanuc",   status:"work",   part:"Вал приводной",          count:19,  load:70, reason:""},
+  7:  {id:7,  name:"Okuma Токарно-Фрезерная",            type:"turning", cnc:"OSP",     status:"work",   part:"Шпиндель точный",        count:8,   load:88, reason:""},
+  8:  {id:8,  name:"Токарный станок Малютка №1",         type:"turning", cnc:"NC-201",  status:"work",   part:"Шпилька М12",            count:142, load:50, reason:""},
+  9:  {id:9,  name:"Токарный станок Малютка №2",         type:"turning", cnc:"NC-201",  status:"no-mat", part:"Ожидание",               count:80,  load:0,  reason:"Ждём материал — пруток Ø20"},
+  10: {id:10, name:"Токарный с револьверной головкой Siemens", type:"turning", cnc:"Siemens", status:"work", part:"Муфта муфтовая",     count:24,  load:82, reason:""},
+  11: {id:11, name:"Токарный с револьверной головкой",   type:"turning", cnc:"ЧПУ",     status:"break",  part:"Сбой привода",           count:11,  load:0,  reason:"Сбой привода главного шпинделя — вызван наладчик"},
+  12: {id:12, name:"Фрезерная группа",                   type:"issue",   cnc:"Вопросы", status:"ok",    note:"Требуется поставка фрез Ø12 — 5 шт.\nОжидаем отклик от снабжения."},
+  13: {id:13, name:"Токарная группа",                    type:"issue",   cnc:"Вопросы", status:"alert", note:"ОТК выявило отклонение по 3 деталям.\nНужна внеплановая проверка партии."}
 };
 
-const mapEl = document.getElementById('map');
-const mapInner = document.getElementById('mapInner');
-const panel = document.getElementById('panel');
-const closeBtn = document.getElementById('closeBtn');
-let selectedId = null;
+/* ============================================================
+   СОСТОЯНИЕ
+   ============================================================ */
+let macs = [];
+let curId = null;
+let curType = null;
+let localDemo = JSON.parse(JSON.stringify(initialData));
+let lastOk = false;
 
-function render() {
-  mapInner.innerHTML = '';
-  machines.forEach(m => {
-    const el = document.createElement('div');
-    el.className = `machine ${m.status}` + (selectedId === m.id ? ' selected' : '');
-    el.style.left = m.x + 'px';
-    el.style.top  = m.y + 'px';
-    el.innerHTML = `
-      <div class="pulse"></div>
-      <div class="id">${m.id}</div>
-      <div class="op">${m.operator}</div>
-    `;
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      selectedId = m.id;
-      render();
-      renderPanel();
-      panel.classList.remove('hidden');
-    });
-    mapInner.appendChild(el);
-  });
-  updateKPI();
-}
-
-function updateKPI() {
-  const counts = { running:0, idle:0, repair:0, alarm:0 };
-  machines.forEach(m => counts[m.status]++);
-  document.getElementById('kpiRun').textContent   = counts.running;
-  document.getElementById('kpiIdle').textContent  = counts.idle;
-  document.getElementById('kpiRep').textContent   = counts.repair;
-  document.getElementById('kpiAlarm').textContent = counts.alarm;
-}
-
-function renderPanel() {
-  const m = machines.find(x => x.id === selectedId);
-  if (!m) return;
-  panel.innerHTML = `
-    <button class="close-btn" id="closeBtn">✕</button>
-    <h2>${m.id}</h2>
-    <div class="detail-row"><span>Статус</span>
-      <span class="status-badge badge-${m.status}">${statusLabels[m.status]}</span>
-    </div>
-    <div class="detail-row"><span>Оператор</span><span>${m.operator}</span></div>
-    <div class="detail-row"><span>Загрузка</span><span>${m.load}%</span></div>
-    <div class="progress"><div style="width:${m.load}%"></div></div>
-    <div class="detail-row" style="margin-top:14px"><span>Выработка, шт/см</span><span>${m.output}</span></div>
-    <div class="detail-row"><span>Наработка, ч</span><span>${(m.output/50).toFixed(1)}</span></div>
-  `;
-  document.getElementById('closeBtn').onclick = () => {
-    panel.classList.add('hidden');
-    selectedId = null;
-    render();
-  };
-}
-
-closeBtn.onclick = () => {
-  panel.classList.add('hidden');
-  selectedId = null;
-  render();
-};
-
-// Зум/панорамирование
-let scale = 1, panX = 0, panY = 0;
-let lastDist = 0, lastX = 0, lastY = 0;
-
-mapEl.addEventListener('touchstart', (e) => {
-  if (e.touches.length === 1) {
-    lastX = e.touches[0].clientX;
-    lastY = e.touches[0].clientY;
-  } else if (e.touches.length === 2) {
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    lastDist = Math.hypot(dx, dy);
-  }
-}, { passive: true });
-
-mapEl.addEventListener('touchmove', (e) => {
-  if (e.touches.length === 1) {
-    const x = e.touches[0].clientX;
-    const y = e.touches[0].clientY;
-    panX += x - lastX;
-    panY += y - lastY;
-    lastX = x; lastY = y;
-  } else if (e.touches.length === 2) {
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    const dist = Math.hypot(dx, dy);
-    if (lastDist > 0) {
-      scale = Math.max(0.5, Math.min(3, scale * (dist / lastDist)));
-    }
-    lastDist = dist;
-  }
-  applyTransform();
-}, { passive: true });
-
-mapEl.addEventListener('touchend', () => { lastDist = 0; });
-
-mapEl.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  scale = Math.max(0.5, Math.min(3, scale * (e.deltaY > 0 ? 0.9 : 1.1)));
-  applyTransform();
-}, { passive: false });
-
-function applyTransform() {
-  mapInner.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
-}
-
-// Обновления «живых» данных
-setInterval(() => {
-  machines.forEach(m => {
-    if (m.status === 'running') {
-      m.output += Math.floor(Math.random() * 5);
-      m.load = Math.min(100, Math.max(60, m.load + (Math.random()*10 - 5)));
-    }
-  });
-  if (selectedId) renderPanel();
-}, 3000);
-
-setInterval(() => {
-  const m = machines[Math.floor(Math.random() * machines.length)];
-  if (m.status === 'running' && Math.random() < 0.15) {
-    m.status = 'idle'; m.load = 0; m.operator = '—';
-  } else if (m.status === 'idle' && Math.random() < 0.5) {
-    m.status = 'running'; m.load = 75; m.operator = 'Новый оп.';
-  }
-  render();
-}, 5000);
-
-/* =======================================================
-   2. БЛОКНОТЫ (Оперативные / Производственные)
-======================================================= */
-
-// Храним заметки в localStorage
-const STORAGE_KEYS = {
-  operational: 'machine-map-notes-operational',
-  production:  'machine-map-notes-production'
-};
-
-const notebooks = {
-  operational: {
-    title: '⚡ Оперативные вопросы',
-    accent: '#f1c40f',
-    notes: JSON.parse(localStorage.getItem(STORAGE_KEYS.operational) || '[]')
-  },
-  production: {
-    title: '🏭 Производственные вопросы',
-    accent: '#58a6ff',
-    notes: JSON.parse(localStorage.getItem(STORAGE_KEYS.production) || '[]')
-  }
-};
-
-let currentNotebook = null; // 'operational' | 'production' | null
-
-// DOM
-const modal       = document.getElementById('notebookModal');
-const modalTitle  = document.getElementById('notebookTitle');
-const modalAccent = document.getElementById('notebookAccent');
-const notesList   = document.getElementById('notesList');
-const noteInput   = document.getElementById('noteInput');
-const btnAddNote  = document.getElementById('btnAddNote');
-const countOp     = document.getElementById('countOp');
-const countPr     = document.getElementById('countPr');
-const tabOp       = document.getElementById('tabOp');
-const tabPr       = document.getElementById('tabPr');
-const notebookClose = document.getElementById('notebookClose');
-
-// Сохранение
-function persist(type) {
-  localStorage.setItem(STORAGE_KEYS[type], JSON.stringify(notebooks[type].notes));
-  updateCounters();
-}
-
-function updateCounters() {
-  countOp.textContent = notebooks.operational.notes.length;
-  countPr.textContent = notebooks.production.notes.length;
-}
-
-// Открыть блокнот
-function openNotebook(type) {
-  currentNotebook = type;
-  const nb = notebooks[type];
-  modalTitle.textContent  = nb.title;
-  modalAccent.style.background = nb.accent;
-  modal.classList.add('open');
-  tabOp.classList.toggle('active', type === 'operational');
-  tabPr.classList.toggle('active', type === 'production');
-  renderNotes();
-  // Фокус на textarea только если не планшет (чтобы не дёргать клавиатуру)
-  if (window.innerWidth > 900) noteInput.focus();
-}
-
-function closeNotebook() {
-  modal.classList.remove('open');
-  currentNotebook = null;
-  tabOp.classList.remove('active');
-  tabPr.classList.remove('active');
-}
-
-// Отрисовка заметок
-function renderNotes() {
-  if (!currentNotebook) return;
-  const notes = notebooks[currentNotebook].notes;
-
-  if (notes.length === 0) {
-    notesList.innerHTML = `<div class="empty-notes">📭 Пока нет заметок.<br>Добавьте первую запись выше.</div>`;
-    return;
-  }
-
-  // Сортируем: новые сверху
-  const sorted = [...notes].sort((a, b) => b.createdAt - a.createdAt);
-
-  notesList.innerHTML = sorted.map(n => `
-    <div class="note-item" data-id="${n.id}">
-      <div class="text">${escapeHtml(n.text)}</div>
-      <div class="meta">
-        <span>${formatDate(n.createdAt)}</span>
-        <button class="del" data-del="${n.id}" title="Удалить">🗑</button>
-      </div>
-    </div>
-  `).join('');
-
-  // Делегирование клика на удаление
-  notesList.querySelectorAll('.del').forEach(btn => {
-    btn.onclick = () => {
-      const id = btn.dataset.del;
-      notebooks[currentNotebook].notes = notebooks[currentNotebook].notes.filter(x => x.id !== id);
-      persist(currentNotebook);
-      renderNotes();
-    };
-  });
-}
-
-// Добавление
-function addNote() {
-  const text = noteInput.value.trim();
-  if (!text) return;
-  const note = {
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    text,
-    createdAt: Date.now()
-  };
-  notebooks[currentNotebook].notes.push(note);
-  persist(currentNotebook);
-  noteInput.value = '';
-  renderNotes();
-  // Мягкая вибро-отдача (Android)
-  if (navigator.vibrate) navigator.vibrate(30);
-}
-
-// Утилиты
-function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, c => ({
-    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+/* ============================================================
+   УТИЛИТЫ
+   ============================================================ */
+function esc(s){
+  return String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[c]));
 }
-
-function formatDate(ts) {
-  const d = new Date(ts);
-  const pad = x => String(x).padStart(2, '0');
-  return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function toast(msg, ok){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.background = ok ? '#10b981' : '#ef4444';
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>el.classList.remove('show'), 3000);
+}
+function setConn(ok){
+  if (ok === lastOk) return;
+  lastOk = ok;
+  const b = document.getElementById('connBadge');
+  if (ok) { b.textContent = '● онлайн'; b.className = 'badge live'; }
+  else    { b.textContent = '● офлайн'; b.className = 'badge offline'; }
 }
 
-// Обработчики
-tabOp.onclick = () => openNotebook('operational');
-tabPr.onclick = () => openNotebook('production');
-notebookClose.onclick = closeNotebook;
-btnAddNote.onclick = addNote;
-
-noteInput.addEventListener('keydown', (e) => {
-  // Ctrl+Enter или Cmd+Enter — быстрое добавление
-  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-    e.preventDefault();
-    addNote();
+/* ============================================================
+   ЗАГРУЗКА
+   ============================================================ */
+async function loadData() {
+  try {
+    const response = await fetch(ROOT_URL);
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    let data = await response.json();
+    if (!data) {
+      await fetch(ROOT_URL, { method: "PUT", body: JSON.stringify(initialData) });
+      data = initialData;
+    }
+    macs = Object.values(data).filter(Boolean);
+    macs.sort((a,b)=>a.id-b.id);
+    setConn(true);
+    render();
+  } catch (e) {
+    console.error("loadData error:", e);
+    setConn(false);
+    if (macs.length === 0) {
+      macs = Object.values(localDemo).sort((a,b)=>a.id-b.id);
+      render();
+    }
   }
-});
-
-// Клик вне блокнота — закрыть
-modal.addEventListener('click', (e) => {
-  if (e.target === modal) closeNotebook();
-});
-
-// Esc — закрыть
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && modal.classList.contains('open')) closeNotebook();
-});
-
-// Инициализация счётчиков
-updateCounters();
-
-/* =======================================================
-   3. PWA
-======================================================= */
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
-let deferredPrompt = null;
-const installBtn = document.getElementById('installBtn');
+/* ============================================================
+   РЕНДЕР
+   ============================================================ */
+function render(){
+  const grid = document.getElementById('g');
+  grid.innerHTML = '';
+  let grp = '';
 
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  installBtn.classList.add('show');
-});
+  macs.forEach(m=>{
+    const gName = m.type==='milling' ? 'Фрезерная группа'
+                : m.type==='turning' ? 'Токарная группа'
+                : 'Производственные вопросы';
 
-installBtn.addEventListener('click', async () => {
-  if (!deferredPrompt) return;
-  deferredPrompt.prompt();
-  const { outcome } = await deferredPrompt.userChoice;
-  if (outcome === 'accepted') installBtn.classList.remove('show');
-  deferredPrompt = null;
-});
+    if (grp !== gName) {
+      grp = gName;
+      const t = document.createElement('h2');
+      t.className = 'gt';
+      t.textContent = grp;
+      grid.appendChild(t);
+    }
 
-window.addEventListener('appinstalled', () => installBtn.classList.remove('show'));
+    const c = document.createElement('div');
+    c.onclick = () => openM(m.id);
 
-/* =======================================================
-   4. СТАРТ
-======================================================= */
-render();
+    // ---- ISSUE-КАРТОЧКА ----
+    if (m.type === 'issue') {
+      const isAlert = m.status === 'alert';
+      c.className = `card ${isAlert ? 'issue-alert' : 'issue-ok'}`;
+      if (isAlert) c.classList.add('break-active');
+
+      const label = isAlert ? '🔴 Внимание' : '🟢 Норма';
+      const note = m.note || '';
+
+      c.innerHTML = `
+        <div class="ch">
+          <div>${esc(m.name)}</div>
+          <div style="font-size:0.75rem;color:var(--m);font-weight:400">${esc(m.cnc)}</div>
+        </div>
+        <div style="font-size:0.85rem;font-weight:bold;margin-bottom:6px">${label}</div>
+        ${note ? `<div class="note-preview">${esc(note)}</div>` : `<div style="font-size:.8rem;color:var(--m);font-style:italic">Заметок нет</div>`}
+      `;
+      grid.appendChild(c);
+      return;
+    }
+
+    // ---- КАРТОЧКА СТАНКА ----
+    c.className = `card ${m.status}`;
+    if (m.status === 'break') c.classList.add('break-active');
+
+    const lbl = m.status==='work' ? '🟢 В работе'
+              : m.status==='setup' ? '🟡 Наладка'
+              : m.status==='break' ? '🔴 Поломка'
+              : '🔵 Нет заготовки';
+
+    // Причина простоя показывается только если станок НЕ в работе и причина заполнена
+    let reasonHtml = '';
+    const reason = (m.reason || '').trim();
+    if (m.status !== 'work' && reason) {
+      reasonHtml = `
+        <div class="reason ${m.status}">
+          <span class="reason-label">Причина простоя</span>
+          ${esc(reason)}
+        </div>`;
+    }
+
+    c.innerHTML = `
+      <div class="ch">
+        <div>${esc(m.name)}</div>
+        <div style="font-size:0.75rem;color:var(--m);font-weight:400">${esc(m.cnc)}</div>
+      </div>
+      <div style="font-size:0.8rem;font-weight:bold;margin-bottom:8px">${lbl}</div>
+      <div class="row"><span>Деталь:</span><span>${esc(m.part)}</span></div>
+      <div class="row"><span>Готово:</span><span>${esc(m.count)} шт</span></div>
+      <div class="row"><span>Загрузка:</span><span>${esc(m.load)}%</span></div>
+      ${reasonHtml}`;
+    grid.appendChild(c);
+  });
+
+  // ---- Статистика ----
+  const machines = macs.filter(m=>m.type!=='issue');
+  const w = machines.filter(m=>m.status==='work').length;
+  const s = machines.filter(m=>m.status==='setup').length;
+  const b = machines.filter(m=>m.status==='break').length;
+
+  document.getElementById('wc').textContent = w;
+  document.getElementById('sc').textContent = s;
+  document.getElementById('bc').textContent = b;
+
+  let sumLoad = 0, working = 0;
+  machines.forEach(m=>{
+    if (m.status==='work') { sumLoad += Number(m.load)||0; working++; }
+  });
+  const total = machines.length || 1;
+  const availability = 1 - b/total;
+  const avgLoad = working > 0 ? sumLoad/working : 0;
+  let oee = Math.round(avgLoad * availability);
+  oee = Math.max(0, Math.min(100, oee));
+  document.getElementById('oee').textContent = oee + '%';
+}
+
+/* ============================================================
+   МОДАЛКА
+   ============================================================ */
+function openM(id){
+  curId = id;
+  const m = macs.find(x=>x.id===id);
+  if (!m) return;
+  curType = m.type;
+
+  document.getElementById('mt').textContent = m.name;
+
+  const machineFields = document.getElementById('machineFields');
+  const issueFields   = document.getElementById('issueFields');
+
+  if (m.type === 'issue') {
+    machineFields.style.display = 'none';
+    issueFields.style.display = 'block';
+
+    const radios = document.getElementsByName('issueStatus');
+    radios.forEach(r => r.checked = (r.value === (m.status === 'alert' ? 'alert' : 'ok')));
+    document.getElementById('fnote').value = m.note || '';
+  } else {
+    machineFields.style.display = 'block';
+    issueFields.style.display = 'none';
+
+    document.getElementById('fst').value = m.status;
+    document.getElementById('fp').value  = m.part;
+    document.getElementById('fc').value  = m.count;
+    document.getElementById('fl').value  = m.load;
+    document.getElementById('fr').value  = m.reason || '';
+  }
+
+  document.getElementById('ov').classList.add('active');
+}
+
+function closeM(){
+  document.getElementById('ov').classList.remove('active');
+  curId = null;
+  curType = null;
+}
+
+/* ============================================================
+   СОХРАНЕНИЕ
+   ============================================================ */
+async function saveM(){
+  if (curId === null) return;
+
+  const btn = document.getElementById('saveBtn');
+  let updates = {};
+
+  if (curType === 'issue') {
+    const selected = document.querySelector('input[name="issueStatus"]:checked');
+    updates = {
+      status: selected ? selected.value : 'ok',
+      note:   document.getElementById('fnote').value
+    };
+  } else {
+    updates = {
+      status: document.getElementById('fst').value,
+      part:   document.getElementById('fp').value.trim(),
+      count:  parseInt(document.getElementById('fc').value, 10) || 0,
+      load:   Math.max(0, Math.min(100, parseInt(document.getElementById('fl').value, 10) || 0)),
+      reason: document.getElementById('fr').value.trim()
+    };
+  }
+
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${BASE}/${curId}.json`, {
+      method: "PATCH",
+      body: JSON.stringify(updates)
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    closeM();
+    await loadData();
+    toast("Сохранено", true);
+  } catch (e) {
+    console.error("saveM error:", e);
+    toast("Не удалось сохранить. Проверьте Firebase Rules.");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ============================================================
+   СБРОС В ДЕМО-ДАННЫЕ
+   ============================================================ */
+async function resetToDemo(){
+  if (!confirm("Сбросить ВСЕ данные в базе Firebase в демо-значения?")) return;
+  try {
+    const res = await fetch(ROOT_URL, { method: "PUT", body: JSON.stringify(initialData) });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    await loadData();
+    toast("База сброшена в демо-данные", true);
+  } catch (e) {
+    console.error("resetToDemo error:", e);
+    toast("Не удалось сбросить базу.");
+  }
+}
+
+/* ============================================================
+   СТАРТ
+   ============================================================ */
+loadData();
+setInterval(loadData, 5000);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeM(); });
 </script>
 </body>
 </html>
