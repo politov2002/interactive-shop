@@ -26,6 +26,12 @@
   .badge.offline{color:var(--b);border-color:var(--b)}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px}
   .gt{grid-column:1/-1;margin:15px 0 5px;color:var(--m);border-left:4px solid #64748b;padding-left:10px;font-size:1rem}
+  /* Акценты заголовков секций */
+  .gt.milling     { border-left-color:#64748b; }
+  .gt.turning     { border-left-color:#64748b; }
+  .gt.operational { border-left-color:var(--n); color:#93c5fd; }
+  .gt.production  { border-left-color:#a855f7; color:#d8b4fe; }
+
   .card{background:var(--c);border:2px solid var(--brd);border-radius:12px;padding:15px;cursor:pointer;position:relative;transition:transform .12s,border-color .12s}
   .card:hover{transform:translateY(-2px);border-color:#475569}
   .card::before{content:'';position:absolute;top:0;left:0;width:100%;height:5px;border-radius:12px 12px 0 0}
@@ -33,23 +39,31 @@
   .card.setup::before{background:var(--s)}
   .card.break::before{background:var(--b)}
   .card.no-mat::before{background:var(--n)}
-  .card.issue-ok::before{background:var(--w)}
-  .card.issue-alert::before{background:var(--b)}
+
+  /* Вопросы: оперативные — синие/зелёные, производственные — свои */
+  .card.op-ok::before{background:var(--w)}
+  .card.op-alert::before{background:var(--b)}
+  .card.pr-ok::before{background:var(--w)}
+  .card.pr-alert::before{background:var(--b)}
+
   @keyframes pulse{50%{border-color:var(--b)}}
   .card.break-active{animation:pulse 2s infinite}
   .card.issue-alert{animation:pulse 2s infinite}
+
   .ch{display:flex;justify-content:space-between;gap:10px;margin-bottom:10px;font-weight:bold;font-size:.95rem}
   .ch > div:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
   .row{display:flex;justify-content:space-between;gap:10px;font-size:.85rem;margin-bottom:4px;color:var(--m)}
   .row span:last-child{color:var(--t);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
-  /* Блок причины простоя */
+
   .reason{margin-top:10px;font-size:.82rem;padding:8px 10px;border-radius:6px;border-left:3px solid;background:rgba(0,0,0,.25);word-break:break-word}
   .reason.break{color:#fca5a5;border-color:var(--b);background:rgba(239,68,68,.1)}
   .reason.setup{color:#fcd34d;border-color:var(--s);background:rgba(245,158,11,.1)}
   .reason.no-mat{color:#93c5fd;border-color:var(--n);background:rgba(59,130,246,.1)}
   .reason-label{display:block;font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;opacity:.7;margin-bottom:2px}
+
   .note-preview{margin-top:8px;font-size:.82rem;color:#cbd5e1;background:#0f172a;border:1px solid var(--brd);border-radius:6px;padding:8px;white-space:pre-wrap;word-break:break-word;max-height:110px;overflow:hidden;position:relative}
   .note-preview::after{content:'';position:absolute;bottom:0;left:0;right:0;height:24px;background:linear-gradient(transparent,#0f172a)}
+
   .ov{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;justify-content:center;align-items:center;z-index:9;padding:15px}
   .ov.active{display:flex}
   .modal{background:#1e1e24;border:1px solid var(--brd);padding:20px;border-radius:12px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto}
@@ -69,6 +83,7 @@
   .status-toggle input:checked + .opt.ok{border-color:var(--w);background:rgba(16,185,129,.12);color:var(--w)}
   .status-toggle input:checked + .opt.alert{border-color:var(--b);background:rgba(239,68,68,.12);color:var(--b)}
   .status-toggle .opt:hover{border-color:#64748b}
+
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#ef4444;color:#fff;padding:10px 18px;border-radius:8px;font-size:.85rem;z-index:20;opacity:0;transition:opacity .3s;pointer-events:none}
   .toast.show{opacity:1}
 </style>
@@ -160,7 +175,12 @@ const BASE = firebaseConfig.databaseURL;
 const ROOT_URL = BASE + "/.json";
 
 /* ============================================================
-   ДЕМО-ДАННЫЕ (с новым полем reason)
+   ДЕМО-ДАННЫЕ
+   type:
+     "milling"     — фрезерная группа
+     "turning"     — токарная группа
+     "operational" — оперативные вопросы
+     "production"  — производственные вопросы
    ============================================================ */
 const initialData = {
   1:  {id:1,  name:"Фрезерный 3Х Китай №1",              type:"milling", cnc:"Fanuc",   status:"work",   part:"Корпус редуктора",       count:14,  load:85, reason:""},
@@ -174,8 +194,10 @@ const initialData = {
   9:  {id:9,  name:"Токарный станок Малютка №2",         type:"turning", cnc:"NC-201",  status:"no-mat", part:"Ожидание",               count:80,  load:0,  reason:"Ждём материал — пруток Ø20"},
   10: {id:10, name:"Токарный с револьверной головкой Siemens", type:"turning", cnc:"Siemens", status:"work", part:"Муфта муфтовая",     count:24,  load:82, reason:""},
   11: {id:11, name:"Токарный с револьверной головкой",   type:"turning", cnc:"ЧПУ",     status:"break",  part:"Сбой привода",           count:11,  load:0,  reason:"Сбой привода главного шпинделя — вызван наладчик"},
-  12: {id:12, name:"Фрезерная группа",                   type:"issue",   cnc:"Вопросы", status:"ok",    note:"Требуется поставка фрез Ø12 — 5 шт.\nОжидаем отклик от снабжения."},
-  13: {id:13, name:"Токарная группа",                    type:"issue",   cnc:"Вопросы", status:"alert", note:"ОТК выявило отклонение по 3 деталям.\nНужна внеплановая проверка партии."}
+  12: {id:12, name:"Оперативная сводка",                 type:"operational", cnc:"Опер.", status:"ok",    note:"Смена работает в штатном режиме.\nИнструмент выдан. Аварий нет."},
+  13: {id:13, name:"Фрезерная группа",                   type:"operational", cnc:"Опер.", status:"alert", note:"Требуется поставка фрез Ø12 — 5 шт.\nОжидаем отклик от снабжения."},
+  14: {id:14, name:"Токарная группа",                    type:"production",  cnc:"Произв.", status:"alert", note:"ОТК выявило отклонение по 3 деталям.\nНужна внеплановая проверка партии."},
+  15: {id:15, name:"Участок сборки",                     type:"production",  cnc:"Произв.", status:"ok",    note:"План на неделю выполнен на 80%.\nГотовим следующую партию."}
 };
 
 /* ============================================================
@@ -183,13 +205,15 @@ const initialData = {
    ============================================================ */
 let macs = [];
 let curId = null;
-let curType = null;
+let curIsIssue = false;
 let localDemo = JSON.parse(JSON.stringify(initialData));
 let lastOk = false;
 
 /* ============================================================
    УТИЛИТЫ
    ============================================================ */
+function isIssue(t){ return t === 'operational' || t === 'production'; }
+
 function esc(s){
   return String(s ?? "").replace(/[&<>"']/g, c => ({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
@@ -239,102 +263,93 @@ async function loadData() {
 
 /* ============================================================
    РЕНДЕР
+   Порядок секций:
+     1) Фрезерная группа
+     2) Токарная группа
+     3) Оперативные вопросы
+     4) Производственные вопросы
    ============================================================ */
 function render(){
   const grid = document.getElementById('g');
   grid.innerHTML = '';
-  let grp = '';
 
-  macs.forEach(m=>{
-    const gName = m.type==='milling' ? 'Фрезерная группа'
-                : m.type==='turning' ? 'Токарная группа'
-                : 'Производственные вопросы';
+  const order = [
+    { key:'milling',      title:'Фрезерная группа',       cls:'milling'     },
+    { key:'turning',      title:'Токарная группа',        cls:'turning'     },
+    { key:'operational',  title:'Оперативные вопросы',    cls:'operational' },
+    { key:'production',   title:'Производственные вопросы', cls:'production' }
+  ];
 
-    if (grp !== gName) {
-      grp = gName;
-      const t = document.createElement('h2');
-      t.className = 'gt';
-      t.textContent = grp;
-      grid.appendChild(t);
-    }
+  order.forEach(sec => {
+    const group = macs.filter(m => m.type === sec.key);
+    if (group.length === 0) return;
 
-    const c = document.createElement('div');
-    c.onclick = () => openM(m.id);
+    const t = document.createElement('h2');
+    t.className = 'gt ' + sec.cls;
+    t.textContent = sec.title;
+    grid.appendChild(t);
 
-    // ---- ISSUE-КАРТОЧКА ----
-    if (m.type === 'issue') {
-      const isAlert = m.status === 'alert';
-      c.className = `card ${isAlert ? 'issue-alert' : 'issue-ok'}`;
-      if (isAlert) c.classList.add('break-active');
+    group.forEach(m => grid.appendChild(buildCard(m)));
+  });
+}
 
-      const label = isAlert ? '🔴 Внимание' : '🟢 Норма';
-      const note = m.note || '';
+function buildCard(m){
+  const c = document.createElement('div');
+  c.onclick = () => openM(m.id);
 
-      c.innerHTML = `
-        <div class="ch">
-          <div>${esc(m.name)}</div>
-          <div style="font-size:0.75rem;color:var(--m);font-weight:400">${esc(m.cnc)}</div>
-        </div>
-        <div style="font-size:0.85rem;font-weight:bold;margin-bottom:6px">${label}</div>
-        ${note ? `<div class="note-preview">${esc(note)}</div>` : `<div style="font-size:.8rem;color:var(--m);font-style:italic">Заметок нет</div>`}
-      `;
-      grid.appendChild(c);
-      return;
-    }
+  // ================= ВОПРОСЫ (оперативные / производственные) =================
+  if (isIssue(m.type)) {
+    const isAlert = m.status === 'alert';
+    const prefix  = m.type === 'operational' ? 'op' : 'pr';
+    c.className = `card ${prefix}-${isAlert ? 'alert' : 'ok'}`;
+    if (isAlert) c.classList.add('break-active');
 
-    // ---- КАРТОЧКА СТАНКА ----
-    c.className = `card ${m.status}`;
-    if (m.status === 'break') c.classList.add('break-active');
-
-    const lbl = m.status==='work' ? '🟢 В работе'
-              : m.status==='setup' ? '🟡 Наладка'
-              : m.status==='break' ? '🔴 Поломка'
-              : '🔵 Нет заготовки';
-
-    // Причина простоя показывается только если станок НЕ в работе и причина заполнена
-    let reasonHtml = '';
-    const reason = (m.reason || '').trim();
-    if (m.status !== 'work' && reason) {
-      reasonHtml = `
-        <div class="reason ${m.status}">
-          <span class="reason-label">Причина простоя</span>
-          ${esc(reason)}
-        </div>`;
-    }
+    const label = isAlert ? '🔴 Внимание' : '🟢 Норма';
+    const note  = m.note || '';
 
     c.innerHTML = `
       <div class="ch">
         <div>${esc(m.name)}</div>
         <div style="font-size:0.75rem;color:var(--m);font-weight:400">${esc(m.cnc)}</div>
       </div>
-      <div style="font-size:0.8rem;font-weight:bold;margin-bottom:8px">${lbl}</div>
-      <div class="row"><span>Деталь:</span><span>${esc(m.part)}</span></div>
-      <div class="row"><span>Готово:</span><span>${esc(m.count)} шт</span></div>
-      <div class="row"><span>Загрузка:</span><span>${esc(m.load)}%</span></div>
-      ${reasonHtml}`;
-    grid.appendChild(c);
-  });
+      <div style="font-size:0.85rem;font-weight:bold;margin-bottom:6px">${label}</div>
+      ${note
+        ? `<div class="note-preview">${esc(note)}</div>`
+        : `<div style="font-size:.8rem;color:var(--m);font-style:italic">Заметок нет</div>`}
+    `;
+    return c;
+  }
 
-  // ---- Статистика ----
-  const machines = macs.filter(m=>m.type!=='issue');
-  const w = machines.filter(m=>m.status==='work').length;
-  const s = machines.filter(m=>m.status==='setup').length;
-  const b = machines.filter(m=>m.status==='break').length;
+  // ================= СТАНКИ =================
+  c.className = `card ${m.status}`;
+  if (m.status === 'break') c.classList.add('break-active');
 
-  document.getElementById('wc').textContent = w;
-  document.getElementById('sc').textContent = s;
-  document.getElementById('bc').textContent = b;
+  const lbl = m.status==='work' ? '🟢 В работе'
+            : m.status==='setup' ? '🟡 Наладка'
+            : m.status==='break' ? '🔴 Поломка'
+            : '🔵 Нет заготовки';
 
-  let sumLoad = 0, working = 0;
-  machines.forEach(m=>{
-    if (m.status==='work') { sumLoad += Number(m.load)||0; working++; }
-  });
-  const total = machines.length || 1;
-  const availability = 1 - b/total;
-  const avgLoad = working > 0 ? sumLoad/working : 0;
-  let oee = Math.round(avgLoad * availability);
-  oee = Math.max(0, Math.min(100, oee));
-  document.getElementById('oee').textContent = oee + '%';
+  let reasonHtml = '';
+  const reason = (m.reason || '').trim();
+  if (m.status !== 'work' && reason) {
+    reasonHtml = `
+      <div class="reason ${m.status}">
+        <span class="reason-label">Причина простоя</span>
+        ${esc(reason)}
+      </div>`;
+  }
+
+  c.innerHTML = `
+    <div class="ch">
+      <div>${esc(m.name)}</div>
+      <div style="font-size:0.75rem;color:var(--m);font-weight:400">${esc(m.cnc)}</div>
+    </div>
+    <div style="font-size:0.8rem;font-weight:bold;margin-bottom:8px">${lbl}</div>
+    <div class="row"><span>Деталь:</span><span>${esc(m.part)}</span></div>
+    <div class="row"><span>Готово:</span><span>${esc(m.count)} шт</span></div>
+    <div class="row"><span>Загрузка:</span><span>${esc(m.load)}%</span></div>
+    ${reasonHtml}`;
+  return c;
 }
 
 /* ============================================================
@@ -344,14 +359,14 @@ function openM(id){
   curId = id;
   const m = macs.find(x=>x.id===id);
   if (!m) return;
-  curType = m.type;
+  curIsIssue = isIssue(m.type);
 
   document.getElementById('mt').textContent = m.name;
 
   const machineFields = document.getElementById('machineFields');
   const issueFields   = document.getElementById('issueFields');
 
-  if (m.type === 'issue') {
+  if (curIsIssue) {
     machineFields.style.display = 'none';
     issueFields.style.display = 'block';
 
@@ -375,7 +390,7 @@ function openM(id){
 function closeM(){
   document.getElementById('ov').classList.remove('active');
   curId = null;
-  curType = null;
+  curIsIssue = false;
 }
 
 /* ============================================================
@@ -387,7 +402,7 @@ async function saveM(){
   const btn = document.getElementById('saveBtn');
   let updates = {};
 
-  if (curType === 'issue') {
+  if (curIsIssue) {
     const selected = document.querySelector('input[name="issueStatus"]:checked');
     updates = {
       status: selected ? selected.value : 'ok',
