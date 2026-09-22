@@ -26,7 +26,6 @@
   .badge.offline{color:var(--b);border-color:var(--b)}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px}
   .gt{grid-column:1/-1;margin:15px 0 5px;color:var(--m);border-left:4px solid #64748b;padding-left:10px;font-size:1rem}
-  /* Акценты заголовков секций */
   .gt.milling     { border-left-color:#64748b; }
   .gt.turning     { border-left-color:#64748b; }
   .gt.operational { border-left-color:var(--n); color:#93c5fd; }
@@ -39,13 +38,10 @@
   .card.setup::before{background:var(--s)}
   .card.break::before{background:var(--b)}
   .card.no-mat::before{background:var(--n)}
-
-  /* Вопросы: оперативные — синие/зелёные, производственные — свои */
   .card.op-ok::before{background:var(--w)}
   .card.op-alert::before{background:var(--b)}
   .card.pr-ok::before{background:var(--w)}
   .card.pr-alert::before{background:var(--b)}
-
   @keyframes pulse{50%{border-color:var(--b)}}
   .card.break-active{animation:pulse 2s infinite}
   .card.issue-alert{animation:pulse 2s infinite}
@@ -66,7 +62,7 @@
 
   .ov{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;justify-content:center;align-items:center;z-index:9;padding:15px}
   .ov.active{display:flex}
-  .modal{background:#1e1e24;border:1px solid var(--brd);padding:20px;border-radius:12px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto}
+  .modal{background:#1e1e24;border:1px solid var(--brd);padding:20px;border-radius:12px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto}
   .modal .ch{margin-bottom:15px}
   .fg{margin-bottom:10px}
   .fg label{display:block;font-size:.8rem;color:var(--m);margin-bottom:4px}
@@ -76,6 +72,8 @@
   .btn{width:100%;background:#4f46e5;color:#fff;border:none;padding:10px;border-radius:6px;font-weight:bold;cursor:pointer;margin-top:10px;font-size:.95rem}
   .btn:hover{background:#4338ca}
   .btn:disabled{opacity:.6;cursor:wait}
+  .btn-secondary{background:#334155}
+  .btn-secondary:hover{background:#475569}
   .status-toggle{display:flex;gap:10px}
   .status-toggle label{flex:1;cursor:pointer;display:block}
   .status-toggle input{display:none}
@@ -84,8 +82,37 @@
   .status-toggle input:checked + .opt.alert{border-color:var(--b);background:rgba(239,68,68,.12);color:var(--b)}
   .status-toggle .opt:hover{border-color:#64748b}
 
+  /* ==== КАЛЕНДАРЬ ==== */
+  .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px}
+  .cal-head .month{font-weight:bold;font-size:1rem}
+  .cal-nav{background:#334155;border:none;color:#fff;width:32px;height:32px;border-radius:6px;cursor:pointer;font-size:1rem}
+  .cal-nav:hover{background:#475569}
+  .cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px}
+  .cal-weekdays div{text-align:center;font-size:.7rem;color:var(--m);text-transform:uppercase;padding:4px 0}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .cal-day{aspect-ratio:1;background:#0f172a;border:1px solid var(--brd);border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:.85rem;color:var(--m);position:relative;transition:border-color .12s,transform .12s}
+  .cal-day:hover{border-color:#6366f1;transform:scale(1.05)}
+  .cal-day.today{border-color:#60a5fa;color:#fff;font-weight:bold}
+  .cal-day.empty{background:transparent;border:none;cursor:default}
+  .cal-day.empty:hover{transform:none}
+  .cal-day .dot{position:absolute;bottom:5px;width:6px;height:6px;border-radius:50%}
+  .cal-day .dot.work{background:var(--w)}
+  .cal-day .dot.setup{background:var(--s)}
+  .cal-day .dot.break{background:var(--b)}
+  .cal-day .dot.no-mat{background:var(--n)}
+
+  /* Форма записи дня */
+  .day-form{margin-top:15px;padding-top:15px;border-top:1px solid var(--brd)}
+  .day-form h4{font-size:.9rem;margin-bottom:10px;color:#60a5fa}
+  .day-form .actions{display:flex;gap:8px;margin-top:10px}
+  .day-form .actions .btn{margin-top:0}
+  .day-form .actions .btn.danger{background:#dc2626}
+  .day-form .actions .btn.danger:hover{background:#b91c1c}
+
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#ef4444;color:#fff;padding:10px 18px;border-radius:8px;font-size:.85rem;z-index:20;opacity:0;transition:opacity .3s;pointer-events:none}
   .toast.show{opacity:1}
+
+  .hidden{display:none !important}
 </style>
 </head>
 <body>
@@ -113,46 +140,90 @@
       <button style="background:none;border:none;color:#fff;cursor:pointer;font-size:1.2rem" onclick="closeM()" aria-label="Закрыть">&times;</button>
     </div>
 
-    <div id="machineFields">
-      <div class="fg">
-        <label>Статус</label>
-        <select id="fst">
-          <option value="work">🟢 В работе / Норма</option>
-          <option value="setup">🟡 Наладка / Обсуждение</option>
-          <option value="break">🔴 Поломка / Внимание</option>
-          <option value="no-mat">🔵 Нет заготовки / Ожидание</option>
-        </select>
-      </div>
-      <div class="fg"><label>Изготавливаемая деталь:</label><input type="text" id="fp"></div>
-      <div class="fg"><label>Количество (шт):</label><input type="number" id="fc" min="0"></div>
-      <div class="fg"><label>Текущая загрузка (%):</label><input type="number" id="fl" min="0" max="100"></div>
-      <div class="fg">
-        <label>Причина простоя (если станок не в работе)</label>
-        <textarea id="fr" placeholder="Например: ожидание материала, сбой привода, переналадка под новую деталь..."></textarea>
-      </div>
-    </div>
+    <!-- ====== ЭКРАН 1: редактирование карточки ====== -->
+    <div id="editScreen">
 
-    <div id="issueFields" style="display:none">
-      <div class="fg">
-        <label>Индикация</label>
-        <div class="status-toggle">
-          <label>
-            <input type="radio" name="issueStatus" value="ok">
-            <div class="opt ok">🟢 Норма / Решено</div>
-          </label>
-          <label>
-            <input type="radio" name="issueStatus" value="alert">
-            <div class="opt alert">🔴 Внимание / Проблема</div>
-          </label>
+      <div id="machineFields">
+        <div class="fg">
+          <label>Статус</label>
+          <select id="fst">
+            <option value="work">🟢 В работе / Норма</option>
+            <option value="setup">🟡 Наладка / Обсуждение</option>
+            <option value="break">🔴 Поломка / Внимание</option>
+            <option value="no-mat">🔵 Нет заготовки / Ожидание</option>
+          </select>
+        </div>
+        <div class="fg"><label>Изготавливаемая деталь:</label><input type="text" id="fp"></div>
+        <div class="fg"><label>Количество (шт):</label><input type="number" id="fc" min="0"></div>
+        <div class="fg"><label>Текущая загрузка (%):</label><input type="number" id="fl" min="0" max="100"></div>
+        <div class="fg">
+          <label>Причина простоя (если станок не в работе)</label>
+          <textarea id="fr" placeholder="Например: ожидание материала, сбой привода, переналадка под новую деталь..."></textarea>
         </div>
       </div>
-      <div class="fg">
-        <label>Блокнот (заметки, задачи, комментарии)</label>
-        <textarea id="fnote" placeholder="Введите текст..."></textarea>
+
+      <div id="issueFields" class="hidden">
+        <div class="fg">
+          <label>Индикация</label>
+          <div class="status-toggle">
+            <label>
+              <input type="radio" name="issueStatus" value="ok">
+              <div class="opt ok">🟢 Норма / Решено</div>
+            </label>
+            <label>
+              <input type="radio" name="issueStatus" value="alert">
+              <div class="opt alert">🔴 Внимание / Проблема</div>
+            </label>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Блокнот (заметки, задачи, комментарии)</label>
+          <textarea id="fnote" placeholder="Введите текст..."></textarea>
+        </div>
       </div>
+
+      <button class="btn" id="saveBtn" onclick="saveM()">Сохранить в базу</button>
+      <button class="btn btn-secondary" id="openJournalBtn" onclick="openJournal()">📅 Журнал по дням</button>
     </div>
 
-    <button class="btn" id="saveBtn" onclick="saveM()">Сохранить в базу</button>
+    <!-- ====== ЭКРАН 2: календарь ====== -->
+    <div id="journalScreen" class="hidden">
+      <div class="cal-head">
+        <button class="cal-nav" onclick="calPrevMonth()">‹</button>
+        <div class="month" id="calMonthLabel">—</div>
+        <button class="cal-nav" onclick="calNextMonth()">›</button>
+      </div>
+
+      <div class="cal-weekdays">
+        <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+
+      <!-- Форма записи дня (скрыта, пока не выбран день) -->
+      <div class="day-form hidden" id="dayForm">
+        <h4 id="dayFormTitle">—</h4>
+
+        <div class="fg">
+          <label>Статус за день</label>
+          <select id="dStatus">
+            <option value="work">🟢 В работе / Норма</option>
+            <option value="setup">🟡 Наладка</option>
+            <option value="break">🔴 Поломка / Простой</option>
+            <option value="no-mat">🔵 Нет заготовки</option>
+          </select>
+        </div>
+        <div class="fg"><label>Количество изготовлено (шт):</label><input type="number" id="dCount" min="0" value="0"></div>
+        <div class="fg"><label>Комментарий за день:</label><textarea id="dNote" placeholder="Что делали, были ли проблемы, что сломано..."></textarea></div>
+
+        <div class="actions">
+          <button class="btn" onclick="saveDay()">💾 Сохранить</button>
+          <button class="btn danger" onclick="deleteDay()">🗑 Удалить</button>
+        </div>
+      </div>
+
+      <button class="btn btn-secondary" onclick="closeJournal()">← Назад к станку</button>
+    </div>
+
   </div>
 </div>
 
@@ -173,14 +244,10 @@ const firebaseConfig = {
 };
 const BASE = firebaseConfig.databaseURL;
 const ROOT_URL = BASE + "/.json";
+const JOURNAL_URL = BASE + "/journal.json";
 
 /* ============================================================
    ДЕМО-ДАННЫЕ
-   type:
-     "milling"     — фрезерная группа
-     "turning"     — токарная группа
-     "operational" — оперативные вопросы
-     "production"  — производственные вопросы
    ============================================================ */
 const initialData = {
   1:  {id:1,  name:"Фрезерный 3Х Китай №1",              type:"milling", cnc:"Fanuc",   status:"work",   part:"Корпус редуктора",       count:14,  load:85, reason:""},
@@ -206,6 +273,9 @@ const initialData = {
 let macs = [];
 let curId = null;
 let curIsIssue = false;
+let journal = {};              // { "<id>": { "YYYY-MM-DD": {status,count,note} } }
+let calYear, calMonth;         // отображаемый месяц календаря (month 0-11)
+let selectedDay = null;        // "YYYY-MM-DD"
 let localDemo = JSON.parse(JSON.stringify(initialData));
 let lastOk = false;
 
@@ -234,21 +304,29 @@ function setConn(ok){
   if (ok) { b.textContent = '● онлайн'; b.className = 'badge live'; }
   else    { b.textContent = '● офлайн'; b.className = 'badge offline'; }
 }
+function pad2(n){ return String(n).padStart(2,'0'); }
+function dateKey(y,m,d){ return `${y}-${pad2(m+1)}-${pad2(d)}`; }
 
 /* ============================================================
    ЗАГРУЗКА
    ============================================================ */
 async function loadData() {
   try {
-    const response = await fetch(ROOT_URL);
-    if (!response.ok) throw new Error("HTTP " + response.status);
-    let data = await response.json();
+    const [rootResp, jResp] = await Promise.all([
+      fetch(ROOT_URL),
+      fetch(JOURNAL_URL)
+    ]);
+    if (!rootResp.ok) throw new Error("HTTP " + rootResp.status);
+
+    let data = await rootResp.json();
     if (!data) {
       await fetch(ROOT_URL, { method: "PUT", body: JSON.stringify(initialData) });
       data = initialData;
     }
-    macs = Object.values(data).filter(Boolean);
-    macs.sort((a,b)=>a.id-b.id);
+    macs = Object.values(data).filter(Boolean).sort((a,b)=>a.id-b.id);
+
+    journal = jResp.ok ? (await jResp.json()) || {} : {};
+
     setConn(true);
     render();
   } catch (e) {
@@ -263,50 +341,59 @@ async function loadData() {
 
 /* ============================================================
    РЕНДЕР
-   Порядок секций:
-     1) Фрезерная группа
-     2) Токарная группа
-     3) Оперативные вопросы
-     4) Производственные вопросы
    ============================================================ */
 function render(){
   const grid = document.getElementById('g');
   grid.innerHTML = '';
 
   const order = [
-    { key:'milling',      title:'Фрезерная группа',       cls:'milling'     },
-    { key:'turning',      title:'Токарная группа',        cls:'turning'     },
-    { key:'operational',  title:'Оперативные вопросы',    cls:'operational' },
-    { key:'production',   title:'Производственные вопросы', cls:'production' }
+    { key:'milling',      title:'Фрезерная группа',        cls:'milling'     },
+    { key:'turning',      title:'Токарная группа',         cls:'turning'     },
+    { key:'operational',  title:'Оперативные вопросы',     cls:'operational' },
+    { key:'production',   title:'Производственные вопросы',cls:'production'  }
   ];
 
   order.forEach(sec => {
     const group = macs.filter(m => m.type === sec.key);
     if (group.length === 0) return;
-
     const t = document.createElement('h2');
     t.className = 'gt ' + sec.cls;
     t.textContent = sec.title;
     grid.appendChild(t);
-
     group.forEach(m => grid.appendChild(buildCard(m)));
   });
+
+  const machines = macs.filter(m=>!isIssue(m.type));
+  const w = machines.filter(m=>m.status==='work').length;
+  const s = machines.filter(m=>m.status==='setup').length;
+  const b = machines.filter(m=>m.status==='break').length;
+  document.getElementById('wc').textContent = w;
+  document.getElementById('sc').textContent = s;
+  document.getElementById('bc').textContent = b;
+
+  let sumLoad = 0, working = 0;
+  machines.forEach(m=>{
+    if (m.status==='work') { sumLoad += Number(m.load)||0; working++; }
+  });
+  const total = machines.length || 1;
+  const availability = 1 - b/total;
+  const avgLoad = working > 0 ? sumLoad/working : 0;
+  let oee = Math.round(avgLoad * availability);
+  oee = Math.max(0, Math.min(100, oee));
+  document.getElementById('oee').textContent = oee + '%';
 }
 
 function buildCard(m){
   const c = document.createElement('div');
   c.onclick = () => openM(m.id);
 
-  // ================= ВОПРОСЫ (оперативные / производственные) =================
   if (isIssue(m.type)) {
     const isAlert = m.status === 'alert';
     const prefix  = m.type === 'operational' ? 'op' : 'pr';
     c.className = `card ${prefix}-${isAlert ? 'alert' : 'ok'}`;
     if (isAlert) c.classList.add('break-active');
-
     const label = isAlert ? '🔴 Внимание' : '🟢 Норма';
     const note  = m.note || '';
-
     c.innerHTML = `
       <div class="ch">
         <div>${esc(m.name)}</div>
@@ -320,7 +407,6 @@ function buildCard(m){
     return c;
   }
 
-  // ================= СТАНКИ =================
   c.className = `card ${m.status}`;
   if (m.status === 'break') c.classList.add('break-active');
 
@@ -353,7 +439,7 @@ function buildCard(m){
 }
 
 /* ============================================================
-   МОДАЛКА
+   МОДАЛКА — ЭКРАН РЕДАКТИРОВАНИЯ
    ============================================================ */
 function openM(id){
   curId = id;
@@ -365,18 +451,20 @@ function openM(id){
 
   const machineFields = document.getElementById('machineFields');
   const issueFields   = document.getElementById('issueFields');
+  const journalBtn    = document.getElementById('openJournalBtn');
+
+  // Календарь — только у станков
+  journalBtn.classList.toggle('hidden', curIsIssue);
 
   if (curIsIssue) {
-    machineFields.style.display = 'none';
-    issueFields.style.display = 'block';
-
+    machineFields.classList.add('hidden');
+    issueFields.classList.remove('hidden');
     const radios = document.getElementsByName('issueStatus');
     radios.forEach(r => r.checked = (r.value === (m.status === 'alert' ? 'alert' : 'ok')));
     document.getElementById('fnote').value = m.note || '';
   } else {
-    machineFields.style.display = 'block';
-    issueFields.style.display = 'none';
-
+    machineFields.classList.remove('hidden');
+    issueFields.classList.add('hidden');
     document.getElementById('fst').value = m.status;
     document.getElementById('fp').value  = m.part;
     document.getElementById('fc').value  = m.count;
@@ -384,6 +472,7 @@ function openM(id){
     document.getElementById('fr').value  = m.reason || '';
   }
 
+  showEditScreen();
   document.getElementById('ov').classList.add('active');
 }
 
@@ -391,10 +480,21 @@ function closeM(){
   document.getElementById('ov').classList.remove('active');
   curId = null;
   curIsIssue = false;
+  selectedDay = null;
+  document.getElementById('dayForm').classList.add('hidden');
+}
+
+function showEditScreen(){
+  document.getElementById('editScreen').classList.remove('hidden');
+  document.getElementById('journalScreen').classList.add('hidden');
+}
+function showJournalScreen(){
+  document.getElementById('editScreen').classList.add('hidden');
+  document.getElementById('journalScreen').classList.remove('hidden');
 }
 
 /* ============================================================
-   СОХРАНЕНИЕ
+   СОХРАНЕНИЕ КАРТОЧКИ
    ============================================================ */
 async function saveM(){
   if (curId === null) return;
@@ -425,39 +525,4 @@ async function saveM(){
       body: JSON.stringify(updates)
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
-    closeM();
-    await loadData();
-    toast("Сохранено", true);
-  } catch (e) {
-    console.error("saveM error:", e);
-    toast("Не удалось сохранить. Проверьте Firebase Rules.");
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-/* ============================================================
-   СБРОС В ДЕМО-ДАННЫЕ
-   ============================================================ */
-async function resetToDemo(){
-  if (!confirm("Сбросить ВСЕ данные в базе Firebase в демо-значения?")) return;
-  try {
-    const res = await fetch(ROOT_URL, { method: "PUT", body: JSON.stringify(initialData) });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    await loadData();
-    toast("База сброшена в демо-данные", true);
-  } catch (e) {
-    console.error("resetToDemo error:", e);
-    toast("Не удалось сбросить базу.");
-  }
-}
-
-/* ============================================================
-   СТАРТ
-   ============================================================ */
-loadData();
-setInterval(loadData, 5000);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeM(); });
-</script>
-</body>
-</html>
+   
