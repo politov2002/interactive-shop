@@ -5,6 +5,11 @@
 <link rel="icon" type="image/svg+xml" href="./icon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Центральный Ситуационный Центр</title>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+
 <style>
   :root{
     --bg:#121214; --c:#1e1e24; --t:#f0faf2; --m:#94a3b8;
@@ -18,12 +23,18 @@
   .st-card{background:var(--c);border:1px solid var(--brd);padding:10px 20px;border-radius:10px;text-align:center;min-width:110px}
   .st-card h3{font-size:.75rem;color:var(--m);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
   .val{font-size:1.5rem;font-weight:700}
-  .toolbar{display:flex;justify-content:center;gap:10px;margin-bottom:15px;flex-wrap:wrap}
+  .toolbar{display:flex;justify-content:center;gap:10px;margin-bottom:15px;flex-wrap:wrap;align-items:center}
   .toolbar button{background:#1e293b;color:#cbd5e1;border:1px solid var(--brd);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.8rem}
   .toolbar button:hover{background:#334155}
+  .toolbar .btn-login{background:#4f46e5;color:#fff;border-color:#4f46e5}
+  .toolbar .btn-login:hover{background:#4338ca}
+  .toolbar .btn-logout{background:#7f1d1d;color:#fecaca;border-color:#7f1d1d}
+  .toolbar .btn-logout:hover{background:#991b1b}
   .badge{display:inline-block;font-size:.7rem;padding:2px 8px;border-radius:10px;background:#0f172a;border:1px solid var(--brd);color:var(--m);margin-left:6px;vertical-align:middle}
   .badge.live{color:var(--w);border-color:var(--w)}
   .badge.offline{color:var(--b);border-color:var(--b)}
+  .badge.role-admin{color:#fbbf24;border-color:#fbbf24}
+  .badge.role-guest{color:#94a3b8;border-color:#475569}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px}
   .gt{grid-column:1/-1;margin:15px 0 5px;color:var(--m);border-left:4px solid #64748b;padding-left:10px;font-size:1rem}
   .gt.milling     { border-left-color:#64748b; }
@@ -82,7 +93,6 @@
   .status-toggle input:checked + .opt.alert{border-color:var(--b);background:rgba(239,68,68,.12);color:var(--b)}
   .status-toggle .opt:hover{border-color:#64748b}
 
-  /* ==== КАЛЕНДАРЬ ==== */
   .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px}
   .cal-head .month{font-weight:bold;font-size:1rem}
   .cal-nav{background:#334155;border:none;color:#fff;width:32px;height:32px;border-radius:6px;cursor:pointer;font-size:1rem}
@@ -101,7 +111,6 @@
   .cal-day .dot.break{background:var(--b)}
   .cal-day .dot.no-mat{background:var(--n)}
 
-  /* Форма записи дня */
   .day-form{margin-top:15px;padding-top:15px;border-top:1px solid var(--brd)}
   .day-form h4{font-size:.9rem;margin-bottom:10px;color:#60a5fa}
   .day-form .actions{display:flex;gap:8px;margin-top:10px}
@@ -113,6 +122,11 @@
   .toast.show{opacity:1}
 
   .hidden{display:none !important}
+
+  #loginOverlay .modal{max-width:380px}
+  #loginOverlay h3{margin-bottom:15px;font-size:1.1rem}
+  #loginOverlay .err{color:#fca5a5;font-size:.8rem;margin-top:8px;min-height:18px}
+  .guest-note{background:#1e293b;border-left:3px solid #f59e0b;padding:8px 12px;border-radius:6px;font-size:.8rem;color:#fcd34d;margin-bottom:12px}
 </style>
 </head>
 <body>
@@ -128,11 +142,15 @@
 </header>
 
 <div class="toolbar">
-  <button onclick="resetToDemo()">↺ Сбросить в демо-данные</button>
+  <button onclick="resetToDemo()" id="resetBtn" class="hidden">↺ Сбросить в демо-данные</button>
+  <button onclick="openLogin()" id="loginBtn" class="btn-login">🔑 Войти как админ</button>
+  <button onclick="doLogout()" id="logoutBtn" class="btn-logout hidden">🚪 Выйти</button>
+  <span id="userBadge" class="badge role-guest">👤 гость (только чтение)</span>
 </div>
 
 <div class="grid" id="g"></div>
 
+<!-- Модалка редактирования -->
 <div class="ov" id="ov" onclick="if(event.target===this)closeM()">
   <div class="modal">
     <div class="ch">
@@ -140,8 +158,10 @@
       <button style="background:none;border:none;color:#fff;cursor:pointer;font-size:1.2rem" onclick="closeM()" aria-label="Закрыть">&times;</button>
     </div>
 
-    <!-- ====== ЭКРАН 1: редактирование карточки ====== -->
     <div id="editScreen">
+      <div id="guestNotice" class="guest-note hidden">
+        ⚠️ Вы вошли как гость. Редактирование недоступно. Нажмите «🔑 Войти как админ», чтобы получить доступ.
+      </div>
 
       <div id="machineFields">
         <div class="fg">
@@ -158,7 +178,7 @@
         <div class="fg"><label>Текущая загрузка (%):</label><input type="number" id="fl" min="0" max="100"></div>
         <div class="fg">
           <label>Причина простоя (если станок не в работе)</label>
-          <textarea id="fr" placeholder="Например: ожидание материала, сбой привода, переналадка под новую деталь..."></textarea>
+          <textarea id="fr" placeholder="Например: ожидание материала, сбой привода..."></textarea>
         </div>
       </div>
 
@@ -166,14 +186,8 @@
         <div class="fg">
           <label>Индикация</label>
           <div class="status-toggle">
-            <label>
-              <input type="radio" name="issueStatus" value="ok">
-              <div class="opt ok">🟢 Норма / Решено</div>
-            </label>
-            <label>
-              <input type="radio" name="issueStatus" value="alert">
-              <div class="opt alert">🔴 Внимание / Проблема</div>
-            </label>
+            <label><input type="radio" name="issueStatus" value="ok"><div class="opt ok">🟢 Норма / Решено</div></label>
+            <label><input type="radio" name="issueStatus" value="alert"><div class="opt alert">🔴 Внимание / Проблема</div></label>
           </div>
         </div>
         <div class="fg">
@@ -186,23 +200,17 @@
       <button class="btn btn-secondary" id="openJournalBtn" onclick="openJournal()">📅 Журнал по дням</button>
     </div>
 
-    <!-- ====== ЭКРАН 2: календарь ====== -->
     <div id="journalScreen" class="hidden">
       <div class="cal-head">
         <button class="cal-nav" onclick="calPrevMonth()">‹</button>
         <div class="month" id="calMonthLabel">—</div>
         <button class="cal-nav" onclick="calNextMonth()">›</button>
       </div>
-
-      <div class="cal-weekdays">
-        <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
-      </div>
+      <div class="cal-weekdays"><div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div></div>
       <div class="cal-grid" id="calGrid"></div>
 
-      <!-- Форма записи дня (скрыта, пока не выбран день) -->
       <div class="day-form hidden" id="dayForm">
         <h4 id="dayFormTitle">—</h4>
-
         <div class="fg">
           <label>Статус за день</label>
           <select id="dStatus">
@@ -213,8 +221,7 @@
           </select>
         </div>
         <div class="fg"><label>Количество изготовлено (шт):</label><input type="number" id="dCount" min="0" value="0"></div>
-        <div class="fg"><label>Комментарий за день:</label><textarea id="dNote" placeholder="Что делали, были ли проблемы, что сломано..."></textarea></div>
-
+        <div class="fg"><label>Комментарий за день:</label><textarea id="dNote" placeholder="Что делали..."></textarea></div>
         <div class="actions">
           <button class="btn" onclick="saveDay()">💾 Сохранить</button>
           <button class="btn danger" onclick="deleteDay()">🗑 Удалить</button>
@@ -223,7 +230,27 @@
 
       <button class="btn btn-secondary" onclick="closeJournal()">← Назад к станку</button>
     </div>
+  </div>
+</div>
 
+<!-- Модалка входа -->
+<div class="ov" id="loginOverlay" onclick="if(event.target===this)closeLogin()">
+  <div class="modal">
+    <div class="ch">
+      <span>🔑 Вход для администратора</span>
+      <button style="background:none;border:none;color:#fff;cursor:pointer;font-size:1.2rem" onclick="closeLogin()">&times;</button>
+    </div>
+    <div class="fg">
+      <label>Email</label>
+      <input type="email" id="loginEmail" autocomplete="username" placeholder="you@example.com">
+    </div>
+    <div class="fg">
+      <label>Пароль</label>
+      <input type="password" id="loginPassword" autocomplete="current-password" placeholder="••••••••">
+    </div>
+    <div class="err" id="loginErr"></div>
+    <button class="btn" id="loginSubmit" onclick="submitLogin()">Войти</button>
+    <button class="btn btn-secondary" onclick="closeLogin()">Отмена</button>
   </div>
 </div>
 
@@ -231,7 +258,7 @@
 
 <script>
 /* ============================================================
-   FIREBASE
+   FIREBASE CONFIG
    ============================================================ */
 const firebaseConfig = {
   apiKey: "AIzaSyD7IyidqpsQNxOyIO-gXiC2Y0iTgfGuBEw",
@@ -242,29 +269,36 @@ const firebaseConfig = {
   messagingSenderId: "523106922724",
   appId: "1:523106922724:web:daa409b569cb12653b3cf1"
 };
+
+// Инициализация Firebase
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+
 const BASE = firebaseConfig.databaseURL;
 const ROOT_URL = BASE + "/.json";
 const JOURNAL_URL = BASE + "/journal.json";
 
+let currentUser = null;
+
 /* ============================================================
-   ДЕМО-ДАННЫЕ
+   ДЕМО-ДАННЫЕ (используются только для инициализации пустой базы)
    ============================================================ */
 const initialData = {
   1:  {id:1,  name:"Фрезерный 3Х Китай №1",              type:"milling", cnc:"Fanuc",   status:"work",   part:"Корпус редуктора",       count:14,  load:85, reason:""},
   2:  {id:2,  name:"Фрезерный 3Х Китай №2",              type:"milling", cnc:"Fanuc",   status:"work",   part:"Фланец А3",              count:32,  load:78, reason:""},
-  3:  {id:3,  name:"Фрезерный 3Х Китай №3",              type:"milling", cnc:"Fanuc",   status:"setup",  part:"Переналадка",            count:0,   load:0,  reason:"Переналадка на новую деталь «Крышка подшипника»"},
+  3:  {id:3,  name:"Фрезерный 3Х Китай №3",              type:"milling", cnc:"Fanuc",   status:"setup",  part:"Переналадка",            count:0,   load:0,  reason:"Переналадка на новую деталь"},
   4:  {id:4,  name:"Рободрил 5-ти координатный",         type:"milling", cnc:"Fanuc",   status:"work",   part:"Лопатка турбины",        count:3,   load:92, reason:""},
-  5:  {id:5,  name:"Фрезерный 3+1 координатный",         type:"milling", cnc:"Fanuc",   status:"no-mat", part:"Ожидание",               count:45,  load:0,  reason:"Нет заготовок — ждём поставку со склада"},
+  5:  {id:5,  name:"Фрезерный 3+1 координатный",         type:"milling", cnc:"Fanuc",   status:"no-mat", part:"Ожидание",               count:45,  load:0,  reason:"Нет заготовок"},
   6:  {id:6,  name:"Китайский Токарно-Фрезерный",        type:"turning", cnc:"Fanuc",   status:"work",   part:"Вал приводной",          count:19,  load:70, reason:""},
   7:  {id:7,  name:"Okuma Токарно-Фрезерная",            type:"turning", cnc:"OSP",     status:"work",   part:"Шпиндель точный",        count:8,   load:88, reason:""},
   8:  {id:8,  name:"Токарный станок Малютка №1",         type:"turning", cnc:"NC-201",  status:"work",   part:"Шпилька М12",            count:142, load:50, reason:""},
-  9:  {id:9,  name:"Токарный станок Малютка №2",         type:"turning", cnc:"NC-201",  status:"no-mat", part:"Ожидание",               count:80,  load:0,  reason:"Ждём материал — пруток Ø20"},
+  9:  {id:9,  name:"Токарный станок Малютка №2",         type:"turning", cnc:"NC-201",  status:"no-mat", part:"Ожидание",               count:80,  load:0,  reason:"Ждём материал"},
   10: {id:10, name:"Токарный с револьверной головкой Siemens", type:"turning", cnc:"Siemens", status:"work", part:"Муфта муфтовая",     count:24,  load:82, reason:""},
-  11: {id:11, name:"Токарный с револьверной головкой",   type:"turning", cnc:"ЧПУ",     status:"break",  part:"Сбой привода",           count:11,  load:0,  reason:"Сбой привода главного шпинделя — вызван наладчик"},
-  12: {id:12, name:"Оперативная сводка",                 type:"operational", cnc:"Опер.", status:"ok",    note:"Смена работает в штатном режиме.\nИнструмент выдан. Аварий нет."},
-  13: {id:13, name:"Фрезерная группа",                   type:"operational", cnc:"Опер.", status:"alert", note:"Требуется поставка фрез Ø12 — 5 шт.\nОжидаем отклик от снабжения."},
-  14: {id:14, name:"Токарная группа",                    type:"production",  cnc:"Произв.", status:"alert", note:"ОТК выявило отклонение по 3 деталям.\nНужна внеплановая проверка партии."},
-  15: {id:15, name:"Участок сборки",                     type:"production",  cnc:"Произв.", status:"ok",    note:"План на неделю выполнен на 80%.\nГотовим следующую партию."}
+  11: {id:11, name:"Токарный с револьверной головкой",   type:"turning", cnc:"ЧПУ",     status:"break",  part:"Сбой привода",           count:11,  load:0,  reason:"Сбой привода"},
+  12: {id:12, name:"Оперативная сводка",                 type:"operational", cnc:"Опер.", status:"ok",    note:"Смена работает в штатном режиме."},
+  13: {id:13, name:"Фрезерная группа",                   type:"operational", cnc:"Опер.", status:"alert", note:"Требуется поставка фрез."},
+  14: {id:14, name:"Токарная группа",                    type:"production",  cnc:"Произв.", status:"alert", note:"Проверка ОТК."},
+  15: {id:15, name:"Участок сборки",                     type:"production",  cnc:"Произв.", status:"ok",    note:""}
 };
 
 /* ============================================================
@@ -273,9 +307,9 @@ const initialData = {
 let macs = [];
 let curId = null;
 let curIsIssue = false;
-let journal = {};              // { "<id>": { "YYYY-MM-DD": {status,count,note} } }
-let calYear, calMonth;         // отображаемый месяц календаря (month 0-11)
-let selectedDay = null;        // "YYYY-MM-DD"
+let journal = {};
+let calYear, calMonth;
+let selectedDay = null;
 let localDemo = JSON.parse(JSON.stringify(initialData));
 let lastOk = false;
 
@@ -283,6 +317,7 @@ let lastOk = false;
    УТИЛИТЫ
    ============================================================ */
 function isIssue(t){ return t === 'operational' || t === 'production'; }
+function isAdmin(){ return !!currentUser; }
 
 function esc(s){
   return String(s ?? "").replace(/[&<>"']/g, c => ({
@@ -308,23 +343,86 @@ function pad2(n){ return String(n).padStart(2,'0'); }
 function dateKey(y,m,d){ return `${y}-${pad2(m+1)}-${pad2(d)}`; }
 
 /* ============================================================
+   АВТОРИЗАЦИЯ
+   ============================================================ */
+function openLogin(){
+  document.getElementById('loginErr').textContent = '';
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginOverlay').classList.add('active');
+  setTimeout(()=>document.getElementById('loginEmail').focus(), 100);
+}
+function closeLogin(){
+  document.getElementById('loginOverlay').classList.remove('active');
+}
+async function submitLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginErr');
+  const btn = document.getElementById('loginSubmit');
+
+  if (!email || !password) { errEl.textContent = 'Введите email и пароль'; return; }
+  btn.disabled = true;
+  errEl.textContent = '';
+  try {
+    await auth.signInWithEmailAndPassword(email, password);
+    closeLogin();
+    toast('Вход выполнен: ' + email, true);
+  } catch (e) {
+    console.error(e);
+    let msg = 'Ошибка входа';
+    if (e.code === 'auth/user-not-found') msg = 'Пользователь не найден';
+    else if (e.code === 'auth/wrong-password') msg = 'Неверный пароль';
+    else if (e.code === 'auth/invalid-email') msg = 'Неверный email';
+    else if (e.code === 'auth/invalid-credential') msg = 'Неверный email или пароль';
+    else msg = e.message || 'Ошибка входа';
+    errEl.textContent = msg;
+  } finally {
+    btn.disabled = false;
+  }
+}
+function doLogout(){
+  auth.signOut().then(() => toast('Вы вышли', true));
+}
+
+auth.onAuthStateChanged(user => {
+  currentUser = user;
+  updateAuthUI();
+  loadData();
+});
+
+function updateAuthUI(){
+  const admin = isAdmin();
+  document.getElementById('resetBtn').classList.toggle('hidden', !admin);
+  document.getElementById('loginBtn').classList.toggle('hidden', admin);
+  document.getElementById('logoutBtn').classList.toggle('hidden', !admin);
+
+  const b = document.getElementById('userBadge');
+  if (admin) {
+    b.textContent = '👤 ' + (currentUser.email || 'админ');
+    b.className = 'badge role-admin';
+  } else {
+    b.textContent = '👤 гость (только чтение)';
+    b.className = 'badge role-guest';
+  }
+}
+
+/* ============================================================
    ЗАГРУЗКА
    ============================================================ */
 async function loadData() {
   try {
-    const [rootResp, jResp] = await Promise.all([
-      fetch(ROOT_URL),
-      fetch(JOURNAL_URL)
-    ]);
+    const [rootResp, jResp] = await Promise.all([fetch(ROOT_URL), fetch(JOURNAL_URL)]);
     if (!rootResp.ok) throw new Error("HTTP " + rootResp.status);
 
     let data = await rootResp.json();
-    if (!data) {
+    if (!data && isAdmin()) {
       await fetch(ROOT_URL, { method: "PUT", body: JSON.stringify(initialData) });
       data = initialData;
     }
-    macs = Object.values(data).filter(Boolean).sort((a,b)=>a.id-b.id);
+    if (!data) data = {};
 
+    macs = Object.values(data).filter(Boolean).sort((a,b)=>a.id-b.id);
     journal = jResp.ok ? (await jResp.json()) || {} : {};
 
     setConn(true);
@@ -439,7 +537,7 @@ function buildCard(m){
 }
 
 /* ============================================================
-   МОДАЛКА — ЭКРАН РЕДАКТИРОВАНИЯ
+   МОДАЛКА
    ============================================================ */
 function openM(id){
   curId = id;
@@ -452,9 +550,11 @@ function openM(id){
   const machineFields = document.getElementById('machineFields');
   const issueFields   = document.getElementById('issueFields');
   const journalBtn    = document.getElementById('openJournalBtn');
+  const guestNotice   = document.getElementById('guestNotice');
+  const saveBtn       = document.getElementById('saveBtn');
 
-  // Календарь — только у станков
   journalBtn.classList.toggle('hidden', curIsIssue);
+  guestNotice.classList.toggle('hidden', isAdmin());
 
   if (curIsIssue) {
     machineFields.classList.add('hidden');
@@ -471,6 +571,14 @@ function openM(id){
     document.getElementById('fl').value  = m.load;
     document.getElementById('fr').value  = m.reason || '';
   }
+
+  // Блокируем все поля для гостей
+  const inputs = document.querySelectorAll('#editScreen input, #editScreen select, #editScreen textarea, #editScreen button');
+  inputs.forEach(el => {
+    if (el.id === 'openJournalBtn') return; // журнал гостям тоже посмотреть можно
+    el.disabled = !isAdmin();
+  });
+  saveBtn.disabled = !isAdmin();
 
   showEditScreen();
   document.getElementById('ov').classList.add('active');
@@ -498,6 +606,7 @@ function showJournalScreen(){
    ============================================================ */
 async function saveM(){
   if (curId === null) return;
+  if (!isAdmin()) { toast('Нужно войти как админ'); return; }
 
   const btn = document.getElementById('saveBtn');
   let updates = {};
@@ -530,7 +639,7 @@ async function saveM(){
     toast("Сохранено", true);
   } catch (e) {
     console.error("saveM error:", e);
-    toast("Не удалось сохранить. Проверьте Firebase Rules.");
+    toast("Не удалось сохранить. Проверьте права доступа.");
   } finally {
     btn.disabled = false;
   }
@@ -551,10 +660,7 @@ function openJournal(){
   showJournalScreen();
   renderCalendar();
 }
-
-function closeJournal(){
-  showEditScreen();
-}
+function closeJournal(){ showEditScreen(); }
 
 function calPrevMonth(){
   calMonth--;
@@ -569,12 +675,10 @@ function calNextMonth(){
 
 function renderCalendar(){
   document.getElementById('calMonthLabel').textContent = `${MONTHS[calMonth]} ${calYear}`;
-
   const grid = document.getElementById('calGrid');
   grid.innerHTML = '';
 
   const first = new Date(calYear, calMonth, 1);
-  // Пн=0 ... Вс=6
   let startOffset = first.getDay() - 1;
   if (startOffset < 0) startOffset = 6;
 
@@ -582,7 +686,6 @@ function renderCalendar(){
   const today = new Date();
   const todayKey = dateKey(today.getFullYear(), today.getMonth(), today.getDate());
 
-  // Пустые ячейки до первого дня
   for (let i = 0; i < startOffset; i++) {
     const e = document.createElement('div');
     e.className = 'cal-day empty';
@@ -590,7 +693,6 @@ function renderCalendar(){
   }
 
   const macJournal = journal[curId] || {};
-
   for (let d = 1; d <= daysInMonth; d++) {
     const key = dateKey(calYear, calMonth, d);
     const cell = document.createElement('div');
@@ -604,7 +706,6 @@ function renderCalendar(){
       dot.className = 'dot ' + rec.status;
       cell.appendChild(dot);
     }
-
     cell.onclick = () => selectDay(key);
     grid.appendChild(cell);
   }
@@ -612,23 +713,26 @@ function renderCalendar(){
 
 function selectDay(key){
   selectedDay = key;
-
   const rec = (journal[curId] || {})[key] || { status:'work', count:0, note:'' };
 
-  // Форматируем дату в «22 сентября 2026»
   const [y,m,d] = key.split('-').map(Number);
-  const monthName = MONTHS[m-1];
-  document.getElementById('dayFormTitle').textContent = `Запись на ${d} ${monthName.toLowerCase()} ${y}`;
+  document.getElementById('dayFormTitle').textContent =
+    `Запись на ${d} ${MONTHS[m-1].toLowerCase()} ${y}`;
 
   document.getElementById('dStatus').value = rec.status || 'work';
   document.getElementById('dCount').value  = rec.count || 0;
   document.getElementById('dNote').value   = rec.note || '';
 
   document.getElementById('dayForm').classList.remove('hidden');
+
+  // Блокировка для гостей
+  const dayInputs = document.querySelectorAll('#dayForm input, #dayForm select, #dayForm textarea, #dayForm button');
+  dayInputs.forEach(el => el.disabled = !isAdmin());
 }
 
 async function saveDay(){
   if (!selectedDay || curId === null) return;
+  if (!isAdmin()) { toast('Нужно войти как админ'); return; }
 
   const rec = {
     status: document.getElementById('dStatus').value,
@@ -646,7 +750,6 @@ async function saveDay(){
 
     if (!journal[curId]) journal[curId] = {};
     journal[curId][selectedDay] = rec;
-
     renderCalendar();
     toast("Запись сохранена", true);
   } catch (e) {
@@ -657,6 +760,7 @@ async function saveDay(){
 
 async function deleteDay(){
   if (!selectedDay || curId === null) return;
+  if (!isAdmin()) { toast('Нужно войти как админ'); return; }
   if (!confirm("Удалить запись за этот день?")) return;
 
   try {
@@ -677,16 +781,14 @@ async function deleteDay(){
 }
 
 /* ============================================================
-   СБРОС В ДЕМО-ДАННЫЕ
+   СБРОС В ДЕМО-ДАННЫЕ (только для админов)
    ============================================================ */
 async function resetToDemo(){
-  if (!confirm("Сбросить ВСЕ данные (карточки и журнал) в демо-значения?")) return;
+  if (!isAdmin()) { toast('Нужно войти как админ'); return; }
+  if (!confirm("Сбросить ВСЕ данные (карточки и журнал) в демо-значения?\n\nЭто действие необратимо!")) return;
   try {
-    // Сбрасываем только карточки — журнал удалять не обязательно.
-    // Но чтобы получить чистое состояние — удаляем и его тоже.
     await fetch(ROOT_URL, { method: "PUT", body: JSON.stringify(initialData) });
     await fetch(JOURNAL_URL, { method: "DELETE" });
-
     journal = {};
     await loadData();
     toast("База сброшена в демо-данные", true);
@@ -701,12 +803,16 @@ async function resetToDemo(){
    ============================================================ */
 loadData();
 setInterval(() => {
-  // Авто-обновление раз в 5 сек, но не мешаем, если открыт календарь
   if (!document.getElementById('journalScreen').classList.contains('hidden')) return;
   loadData();
 }, 5000);
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeM(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (document.getElementById('loginOverlay').classList.contains('active')) closeLogin();
+    else closeM();
+  }
+});
 </script>
 </body>
 </html>
