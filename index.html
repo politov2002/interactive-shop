@@ -410,14 +410,30 @@ function updateAuthUI(){
 /* ============================================================
    ЗАГРУЗКА
    ============================================================ */
+  /* ============================================================
+   ОБЁРТКА НАД FETCH — автоматически добавляет токен Firebase
+   ============================================================ */
+async function fbFetch(url, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (auth.currentUser) {
+    try {
+      const token = await auth.currentUser.getIdToken();
+      headers['Authorization'] = 'Bearer ' + token;
+    } catch (e) {
+      console.warn('Не удалось получить токен:', e);
+    }
+  }
+  return fetch(url, { ...options, headers });
+}
+
 async function loadData() {
   try {
-    const [rootResp, jResp] = await Promise.all([fetch(ROOT_URL), fetch(JOURNAL_URL)]);
+    const [rootResp, jResp] = await Promise.all([fbFetch(ROOT_URL), fbFetch(JOURNAL_URL)]);
     if (!rootResp.ok) throw new Error("HTTP " + rootResp.status);
 
     let data = await rootResp.json();
     if (!data && isAdmin()) {
-      await fetch(ROOT_URL, { method: "PUT", body: JSON.stringify(initialData) });
+      await fbFetch(ROOT_URL, { method: "PUT", body: JSON.stringify(initialData) });
       data = initialData;
     }
     if (!data) data = {};
@@ -629,7 +645,7 @@ async function saveM(){
 
   btn.disabled = true;
   try {
-    const res = await fetch(`${BASE}/${curId}.json`, {
+    const res = await fbFetch(`${BASE}/${curId}.json`, {
       method: "PATCH",
       body: JSON.stringify(updates)
     });
@@ -742,7 +758,7 @@ async function saveDay(){
   };
 
   try {
-    const res = await fetch(`${BASE}/journal/${curId}/${selectedDay}.json`, {
+    const res = await fbFetch(`${BASE}/journal/${curId}/${selectedDay}.json`, {
       method: "PUT",
       body: JSON.stringify(rec)
     });
@@ -764,7 +780,7 @@ async function deleteDay(){
   if (!confirm("Удалить запись за этот день?")) return;
 
   try {
-    const res = await fetch(`${BASE}/journal/${curId}/${selectedDay}.json`, {
+    const res = await fbFetch(`${BASE}/journal/${curId}/${selectedDay}.json`, {
       method: "DELETE"
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -787,8 +803,8 @@ async function resetToDemo(){
   if (!isAdmin()) { toast('Нужно войти как админ'); return; }
   if (!confirm("Сбросить ВСЕ данные (карточки и журнал) в демо-значения?\n\nЭто действие необратимо!")) return;
   try {
-    await fetch(ROOT_URL, { method: "PUT", body: JSON.stringify(initialData) });
-    await fetch(JOURNAL_URL, { method: "DELETE" });
+    await fbFetch(ROOT_URL, { method: "PUT", body: JSON.stringify(initialData) });
+    await fbFetch(JOURNAL_URL, { method: "DELETE" });
     journal = {};
     await loadData();
     toast("База сброшена в демо-данные", true);
